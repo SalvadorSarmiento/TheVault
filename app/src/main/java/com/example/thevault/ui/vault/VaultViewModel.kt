@@ -1,13 +1,14 @@
 package com.example.thevault.ui.vault
 
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
-import com.example.thevault.data.repository.FakeVaultRepository
 import com.example.thevault.data.repository.VaultRepository
+import com.example.thevault.data.repository.RoomVaultRepository
 
 enum class VaultDestination { VAULT, GENERATOR, CATEGORIES, SETTINGS, DETAIL, EDITOR }
 enum class VaultFilter(val label: String) { ALL("Todas"), FAVORITES("Favoritos"), WORK("Trabajo") }
@@ -45,9 +46,15 @@ data class VaultUiState(
 )
 
 class VaultViewModel(
-    private val repository: VaultRepository = FakeVaultRepository()
-) : ViewModel() {
-    var uiState by mutableStateOf(VaultUiState(credentials = repository.getCredentials()))
+    application: Application
+) : AndroidViewModel(application) {
+
+    private val repository: VaultRepository =
+        RoomVaultRepository(application)
+
+    var uiState by mutableStateOf(
+        VaultUiState(credentials = repository.getCredentials())
+    )
         private set
 
     val visibleCredentials: List<Credential>

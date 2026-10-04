@@ -8,7 +8,7 @@ enum class CredentialCategory(val label: String) {
 }
 
 data class Credential(
-    val id: Long,
+    val id: Long = 0,
     val name: String,
     val username: String,
     val password: String,
