@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.thevault.ui.auth.AuthViewModel
 import com.example.thevault.ui.screens.LoginScreen
@@ -29,6 +30,12 @@ private fun TheVaultApp(
     val authState = authViewModel.uiState
     val vaultState = vaultViewModel.uiState
 
+    LaunchedEffect(authState.isAuthenticated) {
+        if (authState.isAuthenticated) {
+            vaultViewModel.syncFromRemote()
+        }
+    }
+
     TheVaultTheme(darkTheme = vaultState.darkTheme) {
         when {
             authState.showSplash -> SplashScreen()
@@ -41,7 +48,10 @@ private fun TheVaultApp(
             )
             else -> VaultAppScreen(
                 viewModel = vaultViewModel,
-                onLogout = authViewModel::logout
+                onLogout = {
+                    authViewModel.logout()
+                    vaultViewModel.clearSession()
+                }
             )
         }
     }

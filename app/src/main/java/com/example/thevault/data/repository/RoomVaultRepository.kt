@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 class RoomVaultRepository(
-    context: Context
+    context: Context,
+    private val ownerIdProvider: () -> String
 ) : VaultRepository {
 
     private val dao = TheVaultDatabase
@@ -17,7 +18,7 @@ class RoomVaultRepository(
 
     override fun getCredentials(): List<Credential> {
         return runBlocking {
-            dao.getAllCredentials()
+            dao.getAllCredentials(ownerIdProvider())
                 .first()
                 .map { it.toCredential() }
         }
@@ -25,9 +26,10 @@ class RoomVaultRepository(
 
     override fun saveCredential(credential: Credential) {
         runBlocking {
-            val entity = CredentialEntity.fromCredential(credential)
+            val ownerId = ownerIdProvider()
+            val entity = CredentialEntity.fromCredential(credential, ownerId)
 
-            val existing = dao.getAllCredentials()
+            val existing = dao.getAllCredentials(ownerId)
                 .first()
                 .any { it.id == credential.id }
 
@@ -41,7 +43,7 @@ class RoomVaultRepository(
 
     override fun deleteCredential(id: Long) {
         runBlocking {
-            val credential = dao.getAllCredentials()
+            val credential = dao.getAllCredentials(ownerIdProvider())
                 .first()
                 .firstOrNull { it.id == id }
 

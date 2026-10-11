@@ -1,10 +1,14 @@
 package com.example.thevault.ui.auth
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.thevault.BuildConfig
+import com.example.thevault.data.auth.awaitResult
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -18,14 +22,19 @@ data class AuthUiState(
     val isAuthenticated: Boolean = false
 )
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
     var uiState by mutableStateOf(AuthUiState())
         private set
 
     init {
         viewModelScope.launch {
             delay(1_400)
-            uiState = uiState.copy(showSplash = false)
+            val hasFirebaseSession = BuildConfig.FIREBASE_CONFIGURED &&
+                FirebaseAuth.getInstance().currentUser != null
+            uiState = uiState.copy(
+                showSplash = false,
+                isAuthenticated = hasFirebaseSession
+            )
         }
     }
 
@@ -49,21 +58,43 @@ class AuthViewModel : ViewModel() {
 
         uiState = uiState.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            delay(650)
-            val isValid = uiState.email.trim().equals(DEMO_EMAIL, ignoreCase = true) &&
-                uiState.password == DEMO_PASSWORD
-            uiState = if (isValid) {
-                uiState.copy(isLoading = false, isAuthenticated = true, password = "")
+            if (BuildConfig.FIREBASE_CONFIGURED) {
+                runCatching {
+                    FirebaseAuth.getInstance()
+                        .signInWithEmailAndPassword(uiState.email.trim(), uiState.password)
+                        .awaitResult()
+                }.onSuccess {
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        isAuthenticated = true,
+                        password = ""
+                    )
+                }.onFailure { error ->
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        error = error.localizedMessage ?: "No se pudo iniciar sesión con Firebase."
+                    )
+                }
             } else {
-                uiState.copy(
-                    isLoading = false,
-                    error = "Correo o contraseña incorrectos. Usa el acceso de demostración."
-                )
+                delay(350)
+                val isValid = uiState.email.trim().equals(DEMO_EMAIL, ignoreCase = true) &&
+                    uiState.password == DEMO_PASSWORD
+                uiState = if (isValid) {
+                    uiState.copy(isLoading = false, isAuthenticated = true, password = "")
+                } else {
+                    uiState.copy(
+                        isLoading = false,
+                        error = "Correo o contraseña incorrectos. Usa el acceso de demostración."
+                    )
+                }
             }
         }
     }
 
     fun logout() {
+        if (BuildConfig.FIREBASE_CONFIGURED) {
+            FirebaseAuth.getInstance().signOut()
+        }
         uiState = AuthUiState(showSplash = false)
     }
 

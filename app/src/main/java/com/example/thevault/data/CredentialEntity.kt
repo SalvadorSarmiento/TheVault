@@ -1,6 +1,7 @@
 package com.example.thevault.data
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.PrimaryKey
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
@@ -9,6 +10,9 @@ import com.example.thevault.data.model.CredentialCategory
 data class CredentialEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    @ColumnInfo(defaultValue = "'demo'")
+    val ownerId: String,
+    val remoteId: String?,
     val name: String,
     val username: String,
     val password: String,
@@ -21,6 +25,7 @@ data class CredentialEntity(
     fun toCredential(): Credential {
         return Credential(
             id = id,
+            remoteId = remoteId,
             name = name,
             username = username,
             password = password,
@@ -32,9 +37,11 @@ data class CredentialEntity(
     }
 
     companion object {
-        fun fromCredential(credential: Credential): CredentialEntity {
+        fun fromCredential(credential: Credential, ownerId: String): CredentialEntity {
             return CredentialEntity(
                 id = credential.id,
+                ownerId = ownerId,
+                remoteId = credential.remoteId,
                 name = credential.name,
                 username = credential.username,
                 password = credential.password,

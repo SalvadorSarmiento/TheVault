@@ -1,14 +1,23 @@
 package com.example.thevault.ui.vault
 
 import android.app.Application
-import androidx.lifecycle.AndroidViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.thevault.BuildConfig
+import com.example.thevault.data.auth.DevelopmentTokenProvider
+import com.example.thevault.data.auth.FirebaseIdTokenProvider
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
-import com.example.thevault.data.repository.VaultRepository
+import com.example.thevault.data.remote.HttpRemoteVaultRepository
+import com.example.thevault.data.remote.RemoteVaultRepository
 import com.example.thevault.data.repository.RoomVaultRepository
+import com.example.thevault.data.repository.VaultRepository
+import com.example.thevault.data.security.CredentialCrypto
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 
 enum class VaultDestination { VAULT, GENERATOR, CATEGORIES, SETTINGS, DETAIL, EDITOR }
 enum class VaultFilter(val label: String) { ALL("Todas"), FAVORITES("Favoritos"), WORK("Trabajo") }
@@ -42,6 +51,7 @@ data class VaultUiState(
     val includeLowercase: Boolean = true,
     val includeNumbers: Boolean = true,
     val includeSymbols: Boolean = true,
+    val isSyncing: Boolean = false,
     val message: String? = null
 )
 
@@ -49,8 +59,22 @@ class VaultViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
-    private val repository: VaultRepository =
-        RoomVaultRepository(application)
+    private val repository: VaultRepository = RoomVaultRepository(application) {
+        if (BuildConfig.FIREBASE_CONFIGURED) {
+            FirebaseAuth.getInstance().currentUser?.uid ?: ANONYMOUS_OWNER
+        } else {
+            DEVELOPMENT_OWNER
+        }
+    }
+    private val remoteRepository: RemoteVaultRepository = HttpRemoteVaultRepository(
+        baseUrl = BuildConfig.API_BASE_URL,
+        tokenProvider = if (BuildConfig.FIREBASE_CONFIGURED) {
+            FirebaseIdTokenProvider()
+        } else {
+            DevelopmentTokenProvider()
+        },
+        crypto = CredentialCrypto(application)
+    )
 
     var uiState by mutableStateOf(
         VaultUiState(credentials = repository.getCredentials())
@@ -145,8 +169,10 @@ class VaultViewModel(
         uiState = uiState.copy(draft = draft)
         if (draft.name.isBlank() || draft.username.isBlank() || draft.password.isBlank()) return
 
+        val current = draft.id?.let { id -> uiState.credentials.firstOrNull { it.id == id } }
         val credential = Credential(
             id = draft.id ?: ((uiState.credentials.maxOfOrNull { it.id } ?: 0L) + 1L),
+            remoteId = current?.remoteId,
             name = draft.name.trim(),
             username = draft.username.trim(),
             password = draft.password,
@@ -162,12 +188,15 @@ class VaultViewModel(
             destination = VaultDestination.DETAIL,
             message = if (draft.id == null) "Credencial agregada" else "Cambios guardados"
         )
+        synchronizeCredential(credential)
     }
 
     fun toggleFavorite() {
         val credential = selectedCredential ?: return
-        repository.saveCredential(credential.copy(isFavorite = !credential.isFavorite))
+        val updated = credential.copy(isFavorite = !credential.isFavorite)
+        repository.saveCredential(updated)
         uiState = uiState.copy(credentials = repository.getCredentials())
+        synchronizeCredential(updated)
     }
 
     fun requestDelete() {
@@ -179,7 +208,8 @@ class VaultViewModel(
     }
 
     fun deleteSelected() {
-        val id = uiState.selectedCredentialId ?: return
+        val credential = selectedCredential ?: return
+        val id = credential.id
         repository.deleteCredential(id)
         uiState = uiState.copy(
             credentials = repository.getCredentials(),
@@ -188,6 +218,47 @@ class VaultViewModel(
             destination = VaultDestination.VAULT,
             message = "Credencial eliminada"
         )
+        credential.remoteId?.let { remoteId ->
+            viewModelScope.launch {
+                runCatching { remoteRepository.deleteCredential(remoteId) }
+                    .onFailure {
+                        uiState = uiState.copy(
+                            message = "Eliminada localmente; no se pudo sincronizar con la API"
+                        )
+                    }
+            }
+        }
+    }
+
+    fun syncFromRemote() {
+        if (uiState.isSyncing) return
+        uiState = uiState.copy(isSyncing = true)
+        viewModelScope.launch {
+            runCatching { remoteRepository.getCredentials() }
+                .onSuccess { remoteCredentials ->
+                    val localCredentials = repository.getCredentials()
+                    remoteCredentials.forEach { remote ->
+                        val local = localCredentials.firstOrNull { it.remoteId == remote.remoteId }
+                        repository.saveCredential(remote.copy(id = local?.id ?: 0L))
+                    }
+                    uiState = uiState.copy(
+                        credentials = repository.getCredentials(),
+                        isSyncing = false,
+                        message = "Bóveda sincronizada"
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(
+                        credentials = repository.getCredentials(),
+                        isSyncing = false,
+                        message = "Sin conexión con la API; se muestran los datos locales"
+                    )
+                }
+        }
+    }
+
+    fun clearSession() {
+        uiState = VaultUiState(darkTheme = uiState.darkTheme)
     }
 
     fun setDarkTheme(enabled: Boolean) {
@@ -243,5 +314,29 @@ class VaultViewModel(
 
     fun clearMessage() {
         uiState = uiState.copy(message = null)
+    }
+
+    private fun synchronizeCredential(credential: Credential) {
+        viewModelScope.launch {
+            runCatching { remoteRepository.saveCredential(credential) }
+                .onSuccess { synchronized ->
+                    repository.saveCredential(synchronized)
+                    uiState = uiState.copy(
+                        credentials = repository.getCredentials(),
+                        selectedCredentialId = synchronized.id,
+                        message = "Cambios sincronizados"
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(
+                        message = "Guardada localmente; no se pudo sincronizar con la API"
+                    )
+                }
+        }
+    }
+
+    private companion object {
+        const val DEVELOPMENT_OWNER = "demo"
+        const val ANONYMOUS_OWNER = "anonymous"
     }
 }
