@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface CredentialDao {
 
-    @Query("SELECT * FROM credentials WHERE ownerId = :ownerId ORDER BY name ASC")
+    @Query("SELECT * FROM credentials WHERE ownerId = :ownerId ORDER BY id ASC")
     fun getAllCredentials(ownerId: String): Flow<List<CredentialEntity>>
 
     @Insert

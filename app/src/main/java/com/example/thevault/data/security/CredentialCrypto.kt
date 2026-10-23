@@ -7,7 +7,6 @@ import android.util.Base64
 import androidx.core.content.edit
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
-import com.example.thevault.data.remote.EncryptedPayloadDto
 import org.json.JSONObject
 import java.security.KeyStore
 import java.security.SecureRandom

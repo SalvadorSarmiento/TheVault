@@ -1,7 +1,7 @@
 package com.example.thevault.data
 
-import androidx.room.Entity
 import androidx.room.ColumnInfo
+import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
@@ -10,19 +10,30 @@ import com.example.thevault.data.model.CredentialCategory
 data class CredentialEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+
     @ColumnInfo(defaultValue = "'demo'")
     val ownerId: String,
-    val remoteId: String?,
-    val name: String,
-    val username: String,
-    val password: String,
-    val website: String,
-    val notes: String,
-    val category: String,
-    val isFavorite: Boolean
-) {
 
-    fun toCredential(): Credential {
+    val remoteId: String?,
+
+    // Columnas antiguas: se conservan para la migración.
+    val name: String = "",
+    val username: String = "",
+    val password: String = "",
+    val website: String = "",
+    val notes: String = "",
+    val category: String = "PERSONAL",
+    val isFavorite: Boolean = false,
+
+    // Nuevo contenido cifrado.
+    val algorithm: String? = null,
+    val kdf: String? = null,
+    val iterations: Int? = null,
+    val saltB64: String? = null,
+    val nonceB64: String? = null,
+    val ciphertextB64: String? = null
+) {
+    fun toLegacyCredential(): Credential {
         return Credential(
             id = id,
             remoteId = remoteId,
@@ -31,25 +42,21 @@ data class CredentialEntity(
             password = password,
             website = website,
             notes = notes,
-            category = CredentialCategory.valueOf(category),
+            category = runCatching {
+                CredentialCategory.valueOf(category)
+            }.getOrDefault(CredentialCategory.PERSONAL),
             isFavorite = isFavorite
         )
     }
 
-    companion object {
-        fun fromCredential(credential: Credential, ownerId: String): CredentialEntity {
-            return CredentialEntity(
-                id = credential.id,
-                ownerId = ownerId,
-                remoteId = credential.remoteId,
-                name = credential.name,
-                username = credential.username,
-                password = credential.password,
-                website = credential.website,
-                notes = credential.notes,
-                category = credential.category.name,
-                isFavorite = credential.isFavorite
-            )
-        }
+    fun toPayload(): EncryptedPayloadDto {
+        return EncryptedPayloadDto(
+            algorithm = requireNotNull(algorithm),
+            kdf = requireNotNull(kdf),
+            iterations = requireNotNull(iterations),
+            saltB64 = requireNotNull(saltB64),
+            nonceB64 = requireNotNull(nonceB64),
+            ciphertextB64 = requireNotNull(ciphertextB64)
+        )
     }
 }
