@@ -1,6 +1,7 @@
 package com.example.thevault.data.repository
 
 import android.content.Context
+
 import com.example.thevault.data.CredentialEntity
 import com.example.thevault.data.TheVaultDatabase
 import com.example.thevault.data.model.Credential
@@ -27,14 +28,14 @@ class RoomVaultRepository(
                 .first()
                 .map { entity ->
                     if (!entity.ciphertextB64.isNullOrBlank()) {
-                        // Registro ya cifrado.
+                        // Registro actual ya cifrado.
                         crypto.decrypt(entity.toPayload())
                             .copy(
                                 id = entity.id,
                                 remoteId = entity.remoteId
                             )
                     } else {
-                        // Registro antiguo: convertirlo y guardar su versión cifrada.
+                        // Registro antiguo para conversion.
                         val credential = entity.toLegacyCredential()
                         val encryptedEntity = encryptToEntity(
                             credential = credential,
@@ -101,7 +102,7 @@ class RoomVaultRepository(
             ownerId = ownerId,
             remoteId = remoteId,
 
-            // No guardar datos sensibles en las columnas antiguas.
+            // MANTENER VACIO, nada de datos para evitar data sensible expuesta.
             name = "",
             username = "",
             password = "",

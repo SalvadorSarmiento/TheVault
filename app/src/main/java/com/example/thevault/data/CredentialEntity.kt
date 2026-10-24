@@ -3,8 +3,9 @@ package com.example.thevault.data
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.example.thevault.data.model.Credential
+import com.example.thevault.data.remote.EncryptedPayloadDto
 import com.example.thevault.data.model.CredentialCategory
+import com.example.thevault.data.model.Credential
 
 @Entity(tableName = "credentials")
 data class CredentialEntity(
@@ -16,7 +17,7 @@ data class CredentialEntity(
 
     val remoteId: String?,
 
-    // Columnas antiguas: se conservan para la migración.
+    // Columnas antiguas, conservadas para la migración.
     val name: String = "",
     val username: String = "",
     val password: String = "",
@@ -25,7 +26,7 @@ data class CredentialEntity(
     val category: String = "PERSONAL",
     val isFavorite: Boolean = false,
 
-    // Nuevo contenido cifrado.
+    // Propiedades del contenido cifrado.
     val algorithm: String? = null,
     val kdf: String? = null,
     val iterations: Int? = null,
@@ -33,6 +34,16 @@ data class CredentialEntity(
     val nonceB64: String? = null,
     val ciphertextB64: String? = null
 ) {
+    fun toPayload(): EncryptedPayloadDto {
+        return EncryptedPayloadDto(
+            algorithm = requireNotNull(algorithm),
+            kdf = requireNotNull(kdf),
+            iterations = requireNotNull(iterations),
+            saltB64 = requireNotNull(saltB64),
+            nonceB64 = requireNotNull(nonceB64),
+            ciphertextB64 = requireNotNull(ciphertextB64)
+        )
+    }
     fun toLegacyCredential(): Credential {
         return Credential(
             id = id,
@@ -48,15 +59,5 @@ data class CredentialEntity(
             isFavorite = isFavorite
         )
     }
-
-    fun toPayload(): EncryptedPayloadDto {
-        return EncryptedPayloadDto(
-            algorithm = requireNotNull(algorithm),
-            kdf = requireNotNull(kdf),
-            iterations = requireNotNull(iterations),
-            saltB64 = requireNotNull(saltB64),
-            nonceB64 = requireNotNull(nonceB64),
-            ciphertextB64 = requireNotNull(ciphertextB64)
-        )
-    }
 }
+

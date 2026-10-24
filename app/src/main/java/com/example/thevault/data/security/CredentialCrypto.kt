@@ -1,5 +1,6 @@
 package com.example.thevault.data.security
 
+import com.example.thevault.data.remote.EncryptedPayloadDto
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties

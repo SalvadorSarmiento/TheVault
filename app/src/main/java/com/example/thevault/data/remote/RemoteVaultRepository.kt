@@ -1,10 +1,15 @@
 package com.example.thevault.data.remote
 
-data class EncryptedPayloadDto(
-    val algorithm: String,
-    val kdf: String,
-    val iterations: Int,
-    val saltB64: String,
-    val nonceB64: String,
-    val ciphertextB64: String
-)
+import com.example.thevault.data.model.Credential
+
+interface RemoteVaultRepository {
+    suspend fun getCredentials(): List<Credential>
+
+    suspend fun saveCredential(
+        credential: Credential
+    ): Credential
+
+    suspend fun deleteCredential(
+        remoteId: String
+    )
+}
