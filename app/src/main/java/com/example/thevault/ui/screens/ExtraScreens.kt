@@ -223,7 +223,7 @@ fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onL
             InfoCard(
                 icon = Icons.Outlined.Storage,
                 title = "Almacenamiento local",
-                body = "Esta versión usa un repositorio en memoria para separar las vistas de la futura persistencia."
+                body = "Las credenciales se guardan cifradas en Room y se sincronizan con la API."
             )
         }
         item {

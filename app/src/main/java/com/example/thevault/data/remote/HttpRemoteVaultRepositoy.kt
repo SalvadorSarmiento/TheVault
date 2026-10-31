@@ -4,21 +4,36 @@ package com.example.thevault.data.remote
 import android.net.Uri
 import com.example.thevault.data.auth.ApiTokenProvider
 import com.example.thevault.data.model.Credential
+import com.example.thevault.data.security.CredentialCipher
 import com.example.thevault.data.security.CredentialCrypto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+
+class RemoteApiException(
+    val statusCode: Int,
+    method: String,
+    path: String,
+    val responseBody: String
+) : IOException("La API respondió HTTP $statusCode en $method $path")
 
 class HttpRemoteVaultRepository(
     baseUrl: String,
     private val tokenProvider: ApiTokenProvider,
-    private val crypto: CredentialCrypto
+    private val crypto: CredentialCipher
 ) : RemoteVaultRepository {
 
-    private val baseUrl = baseUrl.trimEnd('/')
+    private val baseUrl = baseUrl.trimEnd('/').also { value ->
+        val endpoint = runCatching { URL(value) }
+            .getOrElse { throw IllegalArgumentException("URL de API inválida: $value", it) }
+        require(endpoint.protocol == "http" || endpoint.protocol == "https") {
+            "La API debe usar HTTP o HTTPS"
+        }
+        require(endpoint.host.isNotBlank()) { "La URL de la API debe incluir un host" }
+    }
 
     override suspend fun getCredentials(): List<Credential> {
         val response = request(
@@ -28,10 +43,19 @@ class HttpRemoteVaultRepository(
 
         val items = JSONObject(response).getJSONArray("items")
 
-        return buildList {
-            for (index in 0 until items.length()) {
-                val item = items.getJSONObject(index)
-                add(item.toCredential())
+        val decoded = withContext(Dispatchers.Default) {
+            buildList {
+                for (index in 0 until items.length()) {
+                    add(items.getJSONObject(index).toCredential())
+                }
+            }
+        }
+
+        return decoded.map { (credential, payload) ->
+            if (payload.kdf != CredentialCrypto.MASTER_PASSWORD_KDF) {
+                saveCredential(credential)
+            } else {
+                credential
             }
         }
     }
@@ -39,7 +63,9 @@ class HttpRemoteVaultRepository(
     override suspend fun saveCredential(
         credential: Credential
     ): Credential {
-        val encryptedPayload = crypto.encrypt(credential)
+        val encryptedPayload = withContext(Dispatchers.Default) {
+            crypto.encrypt(credential)
+        }
 
         val body = JSONObject().put(
             "encrypted",
@@ -62,9 +88,12 @@ class HttpRemoteVaultRepository(
             )
         }
 
-        return JSONObject(response)
-            .toCredential()
-            .copy(id = credential.id)
+        return withContext(Dispatchers.Default) {
+            JSONObject(response)
+                .toCredential()
+                .first
+                .copy(id = credential.id)
+        }
     }
 
     override suspend fun deleteCredential(remoteId: String) {
@@ -130,9 +159,11 @@ class HttpRemoteVaultRepository(
                 }
 
                 if (status !in 200..299) {
-                    error(
-                        "Error HTTP $status en $method $path: " +
-                                responseBody.take(500)
+                    throw RemoteApiException(
+                        statusCode = status,
+                        method = method,
+                        path = path,
+                        responseBody = responseBody.take(500)
                     )
                 }
 
@@ -143,7 +174,7 @@ class HttpRemoteVaultRepository(
         }
     }
 
-    private fun JSONObject.toCredential(): Credential {
+    private fun JSONObject.toCredential(): Pair<Credential, EncryptedPayloadDto> {
         val remoteId = getString("id")
         val encrypted = getJSONObject("encrypted")
 
@@ -156,9 +187,7 @@ class HttpRemoteVaultRepository(
             ciphertextB64 = encrypted.getString("ciphertextB64")
         )
 
-        return crypto.decrypt(payload).copy(
-            remoteId = remoteId
-        )
+        return crypto.decrypt(payload).copy(remoteId = remoteId) to payload
     }
 
     private fun EncryptedPayloadDto.toJson(): JSONObject =

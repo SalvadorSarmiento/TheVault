@@ -15,8 +15,9 @@ import com.example.thevault.data.remote.HttpRemoteVaultRepository
 import com.example.thevault.data.remote.RemoteVaultRepository
 import com.example.thevault.data.repository.RoomVaultRepository
 import com.example.thevault.data.repository.VaultRepository
-import com.example.thevault.data.security.CredentialCrypto
+import com.example.thevault.data.security.MigratingCredentialCipher
 import com.google.firebase.auth.FirebaseAuth
+import java.security.GeneralSecurityException
 import kotlinx.coroutines.launch
 
 enum class VaultDestination { VAULT, GENERATOR, CATEGORIES, SETTINGS, DETAIL, EDITOR }
@@ -51,6 +52,8 @@ data class VaultUiState(
     val includeLowercase: Boolean = true,
     val includeNumbers: Boolean = true,
     val includeSymbols: Boolean = true,
+    val isUnlocked: Boolean = false,
+    val isUnlocking: Boolean = false,
     val isSyncing: Boolean = false,
     val message: String? = null
 )
@@ -59,27 +62,56 @@ class VaultViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
-    private val repository: VaultRepository = RoomVaultRepository(application) {
-        if (BuildConfig.FIREBASE_CONFIGURED) {
-            FirebaseAuth.getInstance().currentUser?.uid ?: ANONYMOUS_OWNER
-        } else {
-            DEVELOPMENT_OWNER
+    private var repository: VaultRepository? = null
+    private var remoteRepository: RemoteVaultRepository? = null
+    private var crypto: MigratingCredentialCipher? = null
+    private var sessionVersion = 0L
+
+    var uiState by mutableStateOf(VaultUiState())
+        private set
+
+    fun unlock(masterPassword: CharArray, onFailure: (String) -> Unit) {
+        val version = ++sessionVersion
+        val app = getApplication<Application>()
+        crypto?.close()
+        val sessionCrypto = MigratingCredentialCipher(app, masterPassword)
+        masterPassword.fill('\u0000')
+        crypto = sessionCrypto
+
+        val localRepository = RoomVaultRepository(
+            context = app,
+            ownerIdProvider = ::currentOwnerId,
+            crypto = sessionCrypto
+        )
+        val httpRepository = HttpRemoteVaultRepository(
+            baseUrl = BuildConfig.API_BASE_URL,
+            tokenProvider = if (BuildConfig.FIREBASE_CONFIGURED) {
+                FirebaseIdTokenProvider()
+            } else {
+                DevelopmentTokenProvider()
+            },
+            crypto = sessionCrypto
+        )
+        repository = localRepository
+        remoteRepository = httpRepository
+        uiState = uiState.copy(isUnlocking = true, message = null)
+
+        viewModelScope.launch {
+            val localCredentials = runCatching { localRepository.getCredentials() }
+                .getOrElse { error ->
+                    failUnlock(version, error, onFailure)
+                    return@launch
+                }
+            if (version != sessionVersion) return@launch
+
+            uiState = uiState.copy(
+                credentials = localCredentials,
+                isUnlocked = true,
+                isUnlocking = false
+            )
+            syncFromRemote(version, onFailure)
         }
     }
-    private val remoteRepository: RemoteVaultRepository = HttpRemoteVaultRepository(
-        baseUrl = BuildConfig.API_BASE_URL,
-        tokenProvider = if (BuildConfig.FIREBASE_CONFIGURED) {
-            FirebaseIdTokenProvider()
-        } else {
-            DevelopmentTokenProvider()
-        },
-        crypto = CredentialCrypto(application)
-    )
-
-    var uiState by mutableStateOf(
-        VaultUiState(credentials = repository.getCredentials())
-    )
-        private set
 
     val visibleCredentials: List<Credential>
         get() = uiState.credentials.filter { credential ->
@@ -171,7 +203,7 @@ class VaultViewModel(
 
         val current = draft.id?.let { id -> uiState.credentials.firstOrNull { it.id == id } }
         val credential = Credential(
-            id = draft.id ?: ((uiState.credentials.maxOfOrNull { it.id } ?: 0L) + 1L),
+            id = draft.id ?: 0L,
             remoteId = current?.remoteId,
             name = draft.name.trim(),
             username = draft.username.trim(),
@@ -181,22 +213,44 @@ class VaultViewModel(
             category = draft.category,
             isFavorite = draft.isFavorite
         )
-        repository.saveCredential(credential)
-        uiState = uiState.copy(
-            credentials = repository.getCredentials(),
-            selectedCredentialId = credential.id,
-            destination = VaultDestination.DETAIL,
-            message = if (draft.id == null) "Credencial agregada" else "Cambios guardados"
-        )
-        synchronizeCredential(credential)
+        val localRepository = repository ?: return
+        val version = sessionVersion
+        viewModelScope.launch {
+            runCatching {
+                val saved = localRepository.saveCredential(credential)
+                if (version != sessionVersion) return@launch
+                uiState = uiState.copy(
+                    credentials = localRepository.getCredentials(),
+                    selectedCredentialId = saved.id,
+                    destination = VaultDestination.DETAIL,
+                    message = if (draft.id == null) "Credencial agregada" else "Cambios guardados"
+                )
+                synchronizeCredential(saved, version)
+            }.onFailure { error ->
+                if (version == sessionVersion) {
+                    uiState = uiState.copy(message = error.userMessage("No se pudo guardar la credencial"))
+                }
+            }
+        }
     }
 
     fun toggleFavorite() {
         val credential = selectedCredential ?: return
         val updated = credential.copy(isFavorite = !credential.isFavorite)
-        repository.saveCredential(updated)
-        uiState = uiState.copy(credentials = repository.getCredentials())
-        synchronizeCredential(updated)
+        val localRepository = repository ?: return
+        val version = sessionVersion
+        viewModelScope.launch {
+            runCatching {
+                localRepository.saveCredential(updated)
+                if (version != sessionVersion) return@launch
+                uiState = uiState.copy(credentials = localRepository.getCredentials())
+                synchronizeCredential(updated, version)
+            }.onFailure { error ->
+                if (version == sessionVersion) {
+                    uiState = uiState.copy(message = error.userMessage("No se pudo actualizar"))
+                }
+            }
+        }
     }
 
     fun requestDelete() {
@@ -209,55 +263,80 @@ class VaultViewModel(
 
     fun deleteSelected() {
         val credential = selectedCredential ?: return
-        val id = credential.id
-        repository.deleteCredential(id)
-        uiState = uiState.copy(
-            credentials = repository.getCredentials(),
-            selectedCredentialId = null,
-            showDeleteDialog = false,
-            destination = VaultDestination.VAULT,
-            message = "Credencial eliminada"
-        )
-        credential.remoteId?.let { remoteId ->
-            viewModelScope.launch {
-                runCatching { remoteRepository.deleteCredential(remoteId) }
-                    .onFailure {
-                        uiState = uiState.copy(
-                            message = "Eliminada localmente; no se pudo sincronizar con la API"
-                        )
-                    }
+        val localRepository = repository ?: return
+        val httpRepository = remoteRepository ?: return
+        val version = sessionVersion
+        viewModelScope.launch {
+            runCatching {
+                credential.remoteId?.let { httpRepository.deleteCredential(it) }
+                localRepository.deleteCredential(credential.id)
+                if (version != sessionVersion) return@launch
+                uiState = uiState.copy(
+                    credentials = localRepository.getCredentials(),
+                    selectedCredentialId = null,
+                    showDeleteDialog = false,
+                    destination = VaultDestination.VAULT,
+                    message = "Credencial eliminada"
+                )
+            }.onFailure { error ->
+                if (version == sessionVersion) {
+                    uiState = uiState.copy(
+                        showDeleteDialog = false,
+                        message = error.userMessage("No se pudo eliminar; no se realizaron cambios")
+                    )
+                }
             }
         }
     }
 
-    fun syncFromRemote() {
+    private suspend fun syncFromRemote(version: Long, onFailure: (String) -> Unit) {
         if (uiState.isSyncing) return
+        val localRepository = repository ?: return
+        val httpRepository = remoteRepository ?: return
         uiState = uiState.copy(isSyncing = true)
-        viewModelScope.launch {
-            runCatching { remoteRepository.getCredentials() }
-                .onSuccess { remoteCredentials ->
-                    val localCredentials = repository.getCredentials()
-                    remoteCredentials.forEach { remote ->
-                        val local = localCredentials.firstOrNull { it.remoteId == remote.remoteId }
-                        repository.saveCredential(remote.copy(id = local?.id ?: 0L))
-                    }
-                    uiState = uiState.copy(
-                        credentials = repository.getCredentials(),
-                        isSyncing = false,
-                        message = "Bóveda sincronizada"
-                    )
-                }
-                .onFailure {
-                    uiState = uiState.copy(
-                        credentials = repository.getCredentials(),
-                        isSyncing = false,
-                        message = "Sin conexión con la API; se muestran los datos locales"
-                    )
-                }
+        runCatching {
+            val remoteCredentials = httpRepository.getCredentials()
+            if (version != sessionVersion) return
+            val localCredentials = localRepository.getCredentials()
+
+            remoteCredentials.forEach { remote ->
+                val local = localCredentials.firstOrNull { it.remoteId == remote.remoteId }
+                localRepository.saveCredential(remote.copy(id = local?.id ?: 0L))
+            }
+
+            localCredentials.filter { it.remoteId == null }.forEach { pending ->
+                val synchronized = httpRepository.saveCredential(pending)
+                localRepository.saveCredential(synchronized)
+            }
+
+            if (version == sessionVersion) {
+                uiState = uiState.copy(
+                    credentials = localRepository.getCredentials(),
+                    isSyncing = false,
+                    message = "Bóveda sincronizada"
+                )
+            }
+        }.onFailure { error ->
+            if (version != sessionVersion) return
+            if (error.isCryptographicFailure()) {
+                failUnlock(version, error, onFailure)
+            } else {
+                uiState = uiState.copy(
+                    credentials = runCatching { localRepository.getCredentials() }
+                        .getOrDefault(uiState.credentials),
+                    isSyncing = false,
+                    message = "Sin conexión con la API; se muestran los datos locales"
+                )
+            }
         }
     }
 
     fun clearSession() {
+        sessionVersion++
+        crypto?.close()
+        crypto = null
+        repository = null
+        remoteRepository = null
         uiState = VaultUiState(darkTheme = uiState.darkTheme)
     }
 
@@ -316,23 +395,56 @@ class VaultViewModel(
         uiState = uiState.copy(message = null)
     }
 
-    private fun synchronizeCredential(credential: Credential) {
-        viewModelScope.launch {
-            runCatching { remoteRepository.saveCredential(credential) }
-                .onSuccess { synchronized ->
-                    repository.saveCredential(synchronized)
-                    uiState = uiState.copy(
-                        credentials = repository.getCredentials(),
-                        selectedCredentialId = synchronized.id,
-                        message = "Cambios sincronizados"
-                    )
-                }
-                .onFailure {
+    private suspend fun synchronizeCredential(credential: Credential, version: Long) {
+        val localRepository = repository ?: return
+        val httpRepository = remoteRepository ?: return
+        runCatching { httpRepository.saveCredential(credential) }
+            .onSuccess { synchronized ->
+                if (version != sessionVersion) return
+                localRepository.saveCredential(synchronized)
+                uiState = uiState.copy(
+                    credentials = localRepository.getCredentials(),
+                    selectedCredentialId = synchronized.id,
+                    message = "Cambios sincronizados"
+                )
+            }
+            .onFailure {
+                if (version == sessionVersion) {
                     uiState = uiState.copy(
                         message = "Guardada localmente; no se pudo sincronizar con la API"
                     )
                 }
-        }
+            }
+    }
+
+    private fun failUnlock(version: Long, error: Throwable, onFailure: (String) -> Unit) {
+        if (version != sessionVersion) return
+        clearSession()
+        onFailure(
+            if (error.isCryptographicFailure()) {
+                "No se pudo descifrar la bóveda. Verifica la contraseña maestra. " +
+                    "Si usabas la versión anterior, migra primero desde el dispositivo original."
+            } else {
+                error.userMessage("No se pudo abrir la bóveda local")
+            }
+        )
+    }
+
+    private fun currentOwnerId(): String = if (BuildConfig.FIREBASE_CONFIGURED) {
+        FirebaseAuth.getInstance().currentUser?.uid ?: ANONYMOUS_OWNER
+    } else {
+        DEVELOPMENT_OWNER
+    }
+
+    private fun Throwable.isCryptographicFailure(): Boolean =
+        generateSequence(this) { it.cause }.any { it is GeneralSecurityException }
+
+    private fun Throwable.userMessage(fallback: String): String =
+        localizedMessage?.takeIf { it.isNotBlank() } ?: fallback
+
+    override fun onCleared() {
+        crypto?.close()
+        super.onCleared()
     }
 
     private companion object {

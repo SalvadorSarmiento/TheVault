@@ -32,7 +32,12 @@ private fun TheVaultApp(
 
     LaunchedEffect(authState.isAuthenticated) {
         if (authState.isAuthenticated) {
-            vaultViewModel.syncFromRemote()
+            val masterPassword = authViewModel.consumeVaultPassword()
+            if (masterPassword == null) {
+                authViewModel.rejectVaultUnlock("Vuelve a ingresar tu contraseña maestra.")
+            } else {
+                vaultViewModel.unlock(masterPassword, authViewModel::rejectVaultUnlock)
+            }
         }
     }
 
@@ -46,11 +51,12 @@ private fun TheVaultApp(
                 onTogglePassword = authViewModel::togglePasswordVisibility,
                 onLogin = authViewModel::login
             )
+            !vaultState.isUnlocked -> SplashScreen()
             else -> VaultAppScreen(
                 viewModel = vaultViewModel,
                 onLogout = {
-                    authViewModel.logout()
                     vaultViewModel.clearSession()
+                    authViewModel.logout()
                 }
             )
         }

@@ -5,16 +5,18 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CredentialDao {
 
     @Query("SELECT * FROM credentials WHERE ownerId = :ownerId ORDER BY id ASC")
-    fun getAllCredentials(ownerId: String): Flow<List<CredentialEntity>>
+    suspend fun getAllCredentials(ownerId: String): List<CredentialEntity>
+
+    @Query("SELECT * FROM credentials WHERE ownerId = :ownerId AND id = :id LIMIT 1")
+    suspend fun getCredential(ownerId: String, id: Long): CredentialEntity?
 
     @Insert
-    suspend fun insertCredential(credential: CredentialEntity)
+    suspend fun insertCredential(credential: CredentialEntity): Long
 
     @Update
     suspend fun updateCredential(credential: CredentialEntity)

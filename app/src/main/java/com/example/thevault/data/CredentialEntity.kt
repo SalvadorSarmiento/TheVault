@@ -4,8 +4,6 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.thevault.data.remote.EncryptedPayloadDto
-import com.example.thevault.data.model.CredentialCategory
-import com.example.thevault.data.model.Credential
 
 @Entity(tableName = "credentials")
 data class CredentialEntity(
@@ -14,50 +12,20 @@ data class CredentialEntity(
 
     @ColumnInfo(defaultValue = "'demo'")
     val ownerId: String,
-
     val remoteId: String?,
-
-    // Columnas antiguas, conservadas para la migración.
-    val name: String = "",
-    val username: String = "",
-    val password: String = "",
-    val website: String = "",
-    val notes: String = "",
-    val category: String = "PERSONAL",
-    val isFavorite: Boolean = false,
-
-    // Propiedades del contenido cifrado.
-    val algorithm: String? = null,
-    val kdf: String? = null,
-    val iterations: Int? = null,
-    val saltB64: String? = null,
-    val nonceB64: String? = null,
-    val ciphertextB64: String? = null
+    val algorithm: String,
+    val kdf: String,
+    val iterations: Int,
+    val saltB64: String,
+    val nonceB64: String,
+    val ciphertextB64: String
 ) {
-    fun toPayload(): EncryptedPayloadDto {
-        return EncryptedPayloadDto(
-            algorithm = requireNotNull(algorithm),
-            kdf = requireNotNull(kdf),
-            iterations = requireNotNull(iterations),
-            saltB64 = requireNotNull(saltB64),
-            nonceB64 = requireNotNull(nonceB64),
-            ciphertextB64 = requireNotNull(ciphertextB64)
-        )
-    }
-    fun toLegacyCredential(): Credential {
-        return Credential(
-            id = id,
-            remoteId = remoteId,
-            name = name,
-            username = username,
-            password = password,
-            website = website,
-            notes = notes,
-            category = runCatching {
-                CredentialCategory.valueOf(category)
-            }.getOrDefault(CredentialCategory.PERSONAL),
-            isFavorite = isFavorite
-        )
-    }
+    fun toPayload() = EncryptedPayloadDto(
+        algorithm = algorithm,
+        kdf = kdf,
+        iterations = iterations,
+        saltB64 = saltB64,
+        nonceB64 = nonceB64,
+        ciphertextB64 = ciphertextB64
+    )
 }
-

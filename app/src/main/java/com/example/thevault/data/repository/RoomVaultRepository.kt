@@ -5,87 +5,74 @@ import android.content.Context
 import com.example.thevault.data.CredentialEntity
 import com.example.thevault.data.TheVaultDatabase
 import com.example.thevault.data.model.Credential
+import com.example.thevault.data.security.CredentialCipher
 import com.example.thevault.data.security.CredentialCrypto
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class RoomVaultRepository(
     context: Context,
-    private val ownerIdProvider: () -> String
+    private val ownerIdProvider: () -> String,
+    private val crypto: CredentialCipher
 ) : VaultRepository {
 
     private val dao = TheVaultDatabase
         .getDatabase(context.applicationContext)
         .credentialDao()
 
-    private val crypto = CredentialCrypto(context.applicationContext)
-
-    override fun getCredentials(): List<Credential> {
-        return runBlocking {
-            val ownerId = ownerIdProvider()
-
-            dao.getAllCredentials(ownerId)
-                .first()
-                .map { entity ->
-                    if (!entity.ciphertextB64.isNullOrBlank()) {
-                        // Registro actual ya cifrado.
-                        crypto.decrypt(entity.toPayload())
-                            .copy(
-                                id = entity.id,
-                                remoteId = entity.remoteId
-                            )
-                    } else {
-                        // Registro antiguo para conversion.
-                        val credential = entity.toLegacyCredential()
-                        val encryptedEntity = encryptToEntity(
-                            credential = credential,
-                            ownerId = entity.ownerId,
-                            id = entity.id,
-                            remoteId = entity.remoteId
-                        )
-
-                        dao.updateCredential(encryptedEntity)
-
-                        credential
-                    }
+    override suspend fun getCredentials(): List<Credential> {
+        val entities = dao.getAllCredentials(ownerIdProvider())
+        val decoded = withContext(Dispatchers.Default) {
+            entities.map { entity ->
+                val payload = entity.toPayload()
+                val credential = crypto.decrypt(payload).copy(
+                    id = entity.id,
+                    remoteId = entity.remoteId
+                )
+                val replacement = if (payload.kdf != CredentialCrypto.MASTER_PASSWORD_KDF) {
+                    encryptToEntity(
+                        credential = credential,
+                        ownerId = entity.ownerId,
+                        id = entity.id,
+                        remoteId = entity.remoteId
+                    )
+                } else {
+                    null
                 }
+                credential to replacement
+            }
         }
+
+        decoded.mapNotNull { it.second }.forEach { dao.updateCredential(it) }
+        return decoded.map { it.first }
     }
 
-    override fun saveCredential(credential: Credential) {
-        runBlocking {
-            val ownerId = ownerIdProvider()
-
-            val existing = dao.getAllCredentials(ownerId)
-                .first()
-                .any { it.id == credential.id && credential.id != 0L }
-
-            val entity = encryptToEntity(
+    override suspend fun saveCredential(credential: Credential): Credential {
+        val ownerId = ownerIdProvider()
+        val existing = credential.id.takeIf { it != 0L }
+            ?.let { dao.getCredential(ownerId, it) }
+        val entity = withContext(Dispatchers.Default) {
+            encryptToEntity(
                 credential = credential,
                 ownerId = ownerId,
                 id = credential.id,
                 remoteId = credential.remoteId
             )
+        }
 
-            if (existing) {
-                dao.updateCredential(entity)
-            } else {
-                dao.insertCredential(entity)
-            }
+        return if (existing != null) {
+            dao.updateCredential(entity)
+            credential
+        } else {
+            val generatedId = dao.insertCredential(entity.copy(id = 0))
+            credential.copy(id = generatedId)
         }
     }
 
-    override fun deleteCredential(id: Long) {
-        runBlocking {
-            val ownerId = ownerIdProvider()
-
-            val credential = dao.getAllCredentials(ownerId)
-                .first()
-                .firstOrNull { it.id == id }
-
-            if (credential != null) {
-                dao.deleteCredential(credential)
-            }
+    override suspend fun deleteCredential(id: Long) {
+        val credential = dao.getCredential(ownerIdProvider(), id)
+        if (credential != null) {
+            dao.deleteCredential(credential)
         }
     }
 
@@ -101,16 +88,6 @@ class RoomVaultRepository(
             id = id,
             ownerId = ownerId,
             remoteId = remoteId,
-
-            // MANTENER VACIO, nada de datos para evitar data sensible expuesta.
-            name = "",
-            username = "",
-            password = "",
-            website = "",
-            notes = "",
-            category = "PERSONAL",
-            isFavorite = false,
-
             algorithm = payload.algorithm,
             kdf = payload.kdf,
             iterations = payload.iterations,

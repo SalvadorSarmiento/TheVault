@@ -1,8 +1,34 @@
+import java.net.URI
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+val localProperties = Properties().apply {
+    val propertiesFile = rootProject.file("local.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use(::load)
+    }
+}
+
+val configuredApiBaseUrl = (
+    providers.gradleProperty("THEVAULT_API_BASE_URL").orNull
+        ?: providers.environmentVariable("THEVAULT_API_BASE_URL").orNull
+        ?: localProperties.getProperty("THEVAULT_API_BASE_URL")
+    )?.trim()?.trimEnd('/')
+
+val debugApiBaseUrl = configuredApiBaseUrl
+    ?.takeIf { it.isNotBlank() }
+    ?: "http://10.0.2.2:8000"
+val releaseApiBaseUrl = configuredApiBaseUrl
+    ?.takeIf { it.isNotBlank() }
+    ?: "https://api.invalid"
+
+fun String.asBuildConfigString(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 
 val firebaseConfigured = file("google-services.json").exists()
@@ -24,13 +50,15 @@ android {
         versionName = "1.0"
 
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", debugApiBaseUrl.asBuildConfigString())
+        }
         release {
+            buildConfigField("String", "API_BASE_URL", releaseApiBaseUrl.asBuildConfigString())
             optimization {
                 enable = false
             }
@@ -70,4 +98,27 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     ksp(libs.androidx.room.compiler)
+}
+
+val validateReleaseApiUrl = tasks.register("validateReleaseApiUrl") {
+    group = "verification"
+    description = "Verifies that release builds use a valid HTTPS API endpoint."
+    inputs.property("apiUrl", configuredApiBaseUrl.orEmpty())
+
+    doLast {
+        val apiUrl = inputs.properties.getValue("apiUrl") as String
+        require(apiUrl.isNotBlank()) {
+            "Define THEVAULT_API_BASE_URL with the public HTTPS URL of the AWS API."
+        }
+        val uri = runCatching { URI(apiUrl) }.getOrElse {
+            throw GradleException("THEVAULT_API_BASE_URL is not a valid URL: $apiUrl", it)
+        }
+        require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
+            "Release API URL must use HTTPS and include a host: $apiUrl"
+        }
+    }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseApiUrl)
 }

@@ -79,7 +79,7 @@ fun LoginScreen(
         Text("Inicia sesión", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Acceso simulado para presentar la navegación y las vistas del sistema.",
+            "Tu contraseña también protege y desbloquea el contenido cifrado de la bóveda.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -129,7 +129,7 @@ fun LoginScreen(
         VaultPrimaryButton(text = "Iniciar sesión", onClick = onLogin, loading = state.isLoading)
         Spacer(Modifier.height(20.dp))
         Text(
-            "Los datos de esta demo se mantienen únicamente en memoria.",
+            "Usa la misma contraseña maestra para recuperar la bóveda en otro dispositivo.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
