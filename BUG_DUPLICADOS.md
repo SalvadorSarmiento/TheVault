@@ -13,5 +13,14 @@ mantienen uno. Pasaron 10 pruebas de la app y 6 de la API en local.
 Rama de prueba: `prueba/credenciales-duplicadas`. La API se comprobó en local;
 no se cambió su código ni se borraron las copias existentes.
 
-Queda una mejora aparte en la API: reconocer reintentos si crea una cuenta,
-pero se pierde la respuesta por un corte de conexión.
+Pruebas adicionales con cortes reales de conexión, la API local y Room temporal:
+
+- API desconectada al guardar: conserva una sola cuenta al reconectar.
+- Corte antes de que la API guarde: conserva una sola cuenta al reconectar.
+- Corte después de guardar, antes de responder: todavía duplica; quedan dos
+  cuentas en el servidor y dos en el teléfono.
+
+Este último fallo sigue pendiente. La API debe reconocer el reintento como la
+misma creación. La primera corrección no cubre ese caso.
+
+Para repetirlo, consulta [las pruebas de conexión](PRUEBAS_CORTES.md).

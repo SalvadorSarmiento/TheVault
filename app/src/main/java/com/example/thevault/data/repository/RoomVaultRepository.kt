@@ -3,6 +3,7 @@ package com.example.thevault.data.repository
 import android.content.Context
 
 import com.example.thevault.data.CredentialEntity
+import com.example.thevault.data.CredentialDao
 import com.example.thevault.data.TheVaultDatabase
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.security.CredentialCipher
@@ -13,12 +14,9 @@ import kotlinx.coroutines.withContext
 class RoomVaultRepository(
     context: Context,
     private val ownerIdProvider: () -> String,
-    private val crypto: CredentialCipher
+    private val crypto: CredentialCipher,
+    private val dao: CredentialDao = TheVaultDatabase.getDatabase(context.applicationContext).credentialDao()
 ) : VaultRepository {
-
-    private val dao = TheVaultDatabase
-        .getDatabase(context.applicationContext)
-        .credentialDao()
 
     override suspend fun getCredentials(): List<Credential> {
         val entities = dao.getAllCredentials(ownerIdProvider())
