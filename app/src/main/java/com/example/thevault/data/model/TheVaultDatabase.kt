@@ -79,7 +79,12 @@ abstract class TheVaultDatabase : RoomDatabase() {
 
         internal fun migration3To4(context: Context) = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("PRAGMA secure_delete=ON")
+                // This PRAGMA returns a row, so Android SQLite requires the query API.
+                db.query("PRAGMA secure_delete=ON").use { cursor ->
+                    check(cursor.moveToFirst() && cursor.getInt(0) == 1) {
+                        "SQLite secure_delete could not be enabled for the migration"
+                    }
+                }
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS credentials_new (

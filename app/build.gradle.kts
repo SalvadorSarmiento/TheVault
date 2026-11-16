@@ -104,8 +104,12 @@ val validateReleaseApiUrl = tasks.register("validateReleaseApiUrl") {
     group = "verification"
     description = "Verifies that release builds use a valid HTTPS API endpoint."
     inputs.property("apiUrl", configuredApiBaseUrl.orEmpty())
+    inputs.property("firebaseConfigured", firebaseConfigured)
 
     doLast {
+        require(inputs.properties.getValue("firebaseConfigured") as Boolean) {
+            "Release requires app/google-services.json; demo authentication is debug-only."
+        }
         val apiUrl = inputs.properties.getValue("apiUrl") as String
         require(apiUrl.isNotBlank()) {
             "Define THEVAULT_API_BASE_URL with the public HTTPS URL of the AWS API."
@@ -115,6 +119,9 @@ val validateReleaseApiUrl = tasks.register("validateReleaseApiUrl") {
         }
         require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
             "Release API URL must use HTTPS and include a host: $apiUrl"
+        }
+        require(uri.userInfo == null && uri.query == null && uri.fragment == null) {
+            "Release API URL must not contain credentials, a query, or a fragment."
         }
     }
 }

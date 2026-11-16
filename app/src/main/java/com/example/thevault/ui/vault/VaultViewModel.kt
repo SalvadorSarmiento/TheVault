@@ -18,6 +18,7 @@ import com.example.thevault.data.repository.VaultRepository
 import com.example.thevault.data.security.MigratingCredentialCipher
 import com.google.firebase.auth.FirebaseAuth
 import java.security.GeneralSecurityException
+import java.security.SecureRandom
 import kotlinx.coroutines.launch
 
 enum class VaultDestination { VAULT, GENERATOR, CATEGORIES, SETTINGS, DETAIL, EDITOR }
@@ -46,7 +47,7 @@ data class VaultUiState(
     val draft: CredentialDraft = CredentialDraft(),
     val showDeleteDialog: Boolean = false,
     val darkTheme: Boolean = false,
-    val generatedPassword: String = "vQ7!mR2#sL9@pX4$",
+    val generatedPassword: String = "",
     val generatorLength: Int = 16,
     val includeUppercase: Boolean = true,
     val includeLowercase: Boolean = true,
@@ -66,9 +67,14 @@ class VaultViewModel(
     private var remoteRepository: RemoteVaultRepository? = null
     private var crypto: MigratingCredentialCipher? = null
     private var sessionVersion = 0L
+    private val passwordRandom = SecureRandom()
 
     var uiState by mutableStateOf(VaultUiState())
         private set
+
+    init {
+        regeneratePassword()
+    }
 
     fun unlock(masterPassword: CharArray, onFailure: (String) -> Unit) {
         val version = ++sessionVersion
@@ -338,6 +344,7 @@ class VaultViewModel(
         repository = null
         remoteRepository = null
         uiState = VaultUiState(darkTheme = uiState.darkTheme)
+        regeneratePassword()
     }
 
     fun setDarkTheme(enabled: Boolean) {
@@ -374,7 +381,7 @@ class VaultViewModel(
         }
         if (alphabet.isEmpty()) return
         val password = buildString {
-            repeat(uiState.generatorLength) { append(alphabet.random()) }
+            repeat(uiState.generatorLength) { append(alphabet[passwordRandom.nextInt(alphabet.length)]) }
         }
         uiState = uiState.copy(generatedPassword = password)
     }

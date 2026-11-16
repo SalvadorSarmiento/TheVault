@@ -22,6 +22,22 @@ class VaultStorageInstrumentedTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test
+    fun rejectsUnsafeEncryptedPayloadParameters() {
+        CredentialCrypto.fromMasterPassword("test master password".toCharArray()).use { cipher ->
+            val payload = cipher.encrypt(Credential(name = "Test", username = "ana", password = "secret"))
+            listOf(
+                payload.copy(iterations = Int.MAX_VALUE),
+                payload.copy(iterations = 1),
+                payload.copy(saltB64 = "AA=="),
+                payload.copy(nonceB64 = "AA=="),
+                payload.copy(ciphertextB64 = "A".repeat(1_398_105))
+            ).forEach { invalid ->
+                assertThrows(IllegalArgumentException::class.java) { cipher.decrypt(invalid) }
+            }
+        }
+    }
+
+    @Test
     fun masterPasswordDecryptsOnAnotherCipherInstance() {
         val credential = Credential(
             name = "Correo",
@@ -51,7 +67,7 @@ class VaultStorageInstrumentedTest {
     }
 
     @Test
-    fun migrationFromVersion3RemovesPlaintextColumnsAndPreservesData() = runBlocking {
+    fun migrationFromVersion3RemovesPlaintextColumnsAndPreservesData() = runBlocking<Unit> {
         val databaseName = "migration-${System.nanoTime()}.db"
         val secret = "clave-super-secreta"
         context.deleteDatabase(databaseName)

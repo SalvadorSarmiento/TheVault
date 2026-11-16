@@ -10,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
+import java.io.InputStream
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -120,6 +122,7 @@ class HttpRemoteVaultRepository(
 
             try {
                 connection.requestMethod = method
+                connection.instanceFollowRedirects = false
                 connection.connectTimeout = 15_000
                 connection.readTimeout = 15_000
                 connection.setRequestProperty(
@@ -148,13 +151,11 @@ class HttpRemoteVaultRepository(
                 val status = connection.responseCode
                 val responseBody = if (status in 200..299) {
                     connection.inputStream
-                        ?.bufferedReader(Charsets.UTF_8)
-                        ?.use { it.readText() }
+                        ?.use { it.readBoundedUtf8() }
                         .orEmpty()
                 } else {
                     connection.errorStream
-                        ?.bufferedReader(Charsets.UTF_8)
-                        ?.use { it.readText() }
+                        ?.use { it.readBoundedUtf8() }
                         .orEmpty()
                 }
 
@@ -172,6 +173,24 @@ class HttpRemoteVaultRepository(
                 connection.disconnect()
             }
         }
+    }
+
+    private fun InputStream.readBoundedUtf8(): String {
+        val buffer = ByteArray(8192)
+        val output = ByteArrayOutputStream()
+        while (true) {
+            val count = read(buffer)
+            if (count == -1) break
+            if (output.size() + count > MAX_RESPONSE_BYTES) {
+                throw IOException("La respuesta de la API supera el límite de 8 MiB")
+            }
+            output.write(buffer, 0, count)
+        }
+        return output.toString(Charsets.UTF_8.name())
+    }
+
+    private companion object {
+        const val MAX_RESPONSE_BYTES = 8 * 1024 * 1024
     }
 
     private fun JSONObject.toCredential(): Pair<Credential, EncryptedPayloadDto> {

@@ -67,7 +67,13 @@ class CredentialCrypto private constructor(
         val key = deriveKey(passwordSource.password(), salt)
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(TAG_BITS, nonce))
-        val ciphertext = cipher.doFinal(credential.toJson().toString().toByteArray(Charsets.UTF_8))
+        val plaintext = credential.toJson().toString().toByteArray(Charsets.UTF_8)
+        val ciphertext = try {
+            require(plaintext.size <= MAX_CIPHERTEXT_BYTES - TAG_BITS / 8) { "Credencial demasiado grande" }
+            cipher.doFinal(plaintext)
+        } finally {
+            plaintext.fill(0)
+        }
 
         return EncryptedPayloadDto(
             algorithm = "AES-256-GCM",
@@ -82,14 +88,24 @@ class CredentialCrypto private constructor(
     override fun decrypt(payload: EncryptedPayloadDto): Credential {
         require(payload.algorithm == "AES-256-GCM") { "Algoritmo no soportado" }
         require(payload.kdf == kdfName) { "KDF no soportado" }
+        require(payload.iterations in ITERATIONS..MAX_ITERATIONS) { "Iteraciones PBKDF2 fuera de rango" }
+        require(payload.saltB64.length == 24 && payload.nonceB64.length == 16) {
+            "Tamaño de sal o nonce inválido"
+        }
+        require(payload.ciphertextB64.length <= MAX_CIPHERTEXT_BASE64_LENGTH) { "Credencial cifrada demasiado grande" }
 
         val salt = payload.saltB64.fromBase64()
         val nonce = payload.nonceB64.fromBase64()
+        require(salt.size == SALT_BYTES && nonce.size == NONCE_BYTES) { "Tamaño de sal o nonce inválido" }
         val key = deriveKey(passwordSource.password(), salt, payload.iterations)
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_BITS, nonce))
         val plaintext = cipher.doFinal(payload.ciphertextB64.fromBase64())
-        return JSONObject(String(plaintext, Charsets.UTF_8)).toCredential()
+        return try {
+            JSONObject(String(plaintext, Charsets.UTF_8)).toCredential()
+        } finally {
+            plaintext.fill(0)
+        }
     }
 
     private fun deriveKey(
@@ -102,7 +118,11 @@ class CredentialCrypto private constructor(
             val encoded = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
                 .generateSecret(specification)
                 .encoded
-            SecretKeySpec(encoded, "AES")
+            try {
+                SecretKeySpec(encoded, "AES")
+            } finally {
+                encoded.fill(0)
+            }
         } finally {
             specification.clearPassword()
             password.fill('\u0000')
@@ -158,6 +178,9 @@ class CredentialCrypto private constructor(
         const val ANDROID_KEY_STORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val ITERATIONS = 310_000
+        private const val MAX_ITERATIONS = 1_000_000
+        private const val MAX_CIPHERTEXT_BYTES = 1_048_576
+        private const val MAX_CIPHERTEXT_BASE64_LENGTH = 1_398_104 // Up to 1 MiB of encrypted data.
         const val KEY_BITS = 256
         const val TAG_BITS = 128
         const val SALT_BYTES = 16
