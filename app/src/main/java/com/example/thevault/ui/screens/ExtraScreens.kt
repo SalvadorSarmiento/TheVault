@@ -35,6 +35,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.Color
+import com.example.thevault.ui.components.VaultHero
 import androidx.compose.ui.unit.dp
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
@@ -56,26 +59,21 @@ fun PasswordGeneratorScreen(state: VaultUiState, viewModel: VaultViewModel) {
     ) {
         item { ScreenHeader("Generador", "Personaliza una contraseña nueva.") }
         item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
+            VaultHero {
                 Row(
-                    modifier = Modifier.padding(18.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Contraseña generada", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("UNA LLAVE NUEVA", style = MaterialTheme.typography.labelSmall, color = Color(0xFFD9CEF8))
                         Spacer(Modifier.height(10.dp))
-                        Text(state.generatedPassword, style = MaterialTheme.typography.titleLarge)
+                        Text(state.generatedPassword, style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace, color = Color.White)
                     }
                     IconButton(onClick = {
                         clipboard.setText(AnnotatedString(state.generatedPassword))
                         viewModel.showMessage("Contraseña copiada")
                     }) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copiar contraseña")
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copiar contraseña", tint = Color(0xFF98F2CF))
                     }
                 }
             }
@@ -154,7 +152,7 @@ fun CategoriesScreen(credentials: List<Credential>, onCategoryClick: (Credential
                     modifier = Modifier.fillMaxWidth().clickable { onCategoryClick(category) },
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
@@ -178,8 +176,8 @@ fun CategoriesScreen(credentials: List<Credential>, onCategoryClick: (Credential
         item {
             InfoCard(
                 icon = Icons.Outlined.Info,
-                title = "Datos de demostración",
-                body = "Las categorías y credenciales se reinician al cerrar la aplicación."
+                title = "Cada cuenta en su lugar",
+                body = "Elige una categoría al guardar una cuenta para encontrarla más rápido."
             )
         }
     }
@@ -198,7 +196,7 @@ fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onL
                 VaultLogo(Modifier.padding(6.dp).height(58.dp))
                 Column(Modifier.padding(start = 14.dp)) {
                     Text("TheVault", style = MaterialTheme.typography.titleLarge)
-                    Text("ana@ejemplo.com", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Tu espacio personal", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -216,14 +214,14 @@ fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onL
             InfoCard(
                 icon = Icons.Outlined.Lock,
                 title = "Bloqueo automático",
-                body = "En el CRUD real esta opción bloqueará la bóveda después de 1 minuto de inactividad."
+                body = "Por ahora, usa Cerrar sesión cuando termines. El bloqueo por inactividad aún no está disponible."
             )
         }
         item {
             InfoCard(
                 icon = Icons.Outlined.Storage,
                 title = "Almacenamiento local",
-                body = "Las credenciales se guardan cifradas en Room y se sincronizan con la API."
+                body = "Tus cuentas se guardan protegidas en este dispositivo y se sincronizan cuando hay conexión."
             )
         }
         item {
@@ -250,7 +248,7 @@ private fun SettingsRow(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),

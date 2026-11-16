@@ -3,6 +3,8 @@ package com.example.thevault.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +36,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import com.example.thevault.R
+import com.example.thevault.BuildConfig
+import com.example.thevault.ui.components.VaultHero
 import com.example.thevault.ui.auth.AuthUiState
 import com.example.thevault.ui.components.VaultLogo
 import com.example.thevault.ui.components.VaultPrimaryButton
@@ -68,22 +77,30 @@ fun LoginScreen(
     Column(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
             .statusBarsPadding().navigationBarsPadding().imePadding()
-            .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 32.dp),
+            .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(36.dp))
-        VaultLogo(Modifier.size(92.dp))
-        Spacer(Modifier.height(20.dp))
-        Text("TheVault", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(34.dp))
-        Text("Inicia sesión", style = MaterialTheme.typography.headlineMedium)
+        VaultHero {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                    Icon(painterResource(R.drawable.ic_vault_logo), contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+                Text("TheVault", style = MaterialTheme.typography.titleLarge, color = Color.White)
+            }
+            Spacer(Modifier.height(24.dp))
+            Text("Tu mundo digital,\nbien protegido.", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+            Spacer(Modifier.height(12.dp))
+            Text("Tus cuentas. Tu espacio. Tu tranquilidad.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFE1D7FF))
+        }
+        Spacer(Modifier.height(28.dp))
+        Text("Inicia sesión", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
         Text(
-            "Tu contraseña también protege y desbloquea el contenido cifrado de la bóveda.",
+            "Un solo lugar para todas tus cuentas.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(20.dp))
         OutlinedTextField(
             value = state.email,
             onValueChange = onEmailChange,
@@ -91,6 +108,7 @@ fun LoginScreen(
             label = { Text("Correo electrónico") },
             leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null) },
             singleLine = true,
+            shape = RoundedCornerShape(16.dp),
             isError = state.error != null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
         )
@@ -111,25 +129,28 @@ fun LoginScreen(
             },
             visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
             singleLine = true,
+            shape = RoundedCornerShape(16.dp),
             isError = state.error != null,
             supportingText = state.error?.let { error -> { Text(error) } },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)
         )
-        Spacer(Modifier.height(16.dp))
-        Column(
-            modifier = Modifier.fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.medium)
-                .padding(16.dp)
-        ) {
-            Text("Acceso de demostración", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-            Text("Correo: ana@ejemplo.com", style = MaterialTheme.typography.bodyMedium)
-            Text("Contraseña: 123456", style = MaterialTheme.typography.bodyMedium)
-        }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(22.dp))
         VaultPrimaryButton(text = "Iniciar sesión", onClick = onLogin, loading = state.isLoading)
+        if (!BuildConfig.FIREBASE_CONFIGURED) {
+            Spacer(Modifier.height(18.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.medium)
+                    .padding(16.dp)
+            ) {
+                Text("Prueba la app", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text("Correo: ana@ejemplo.com", style = MaterialTheme.typography.bodyMedium)
+                Text("Contraseña: 123456", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
         Spacer(Modifier.height(20.dp))
         Text(
-            "Usa la misma contraseña maestra para recuperar la bóveda en otro dispositivo.",
+            "Tu contraseña maestra es la llave de tu bóveda.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

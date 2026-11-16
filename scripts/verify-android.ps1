@@ -18,6 +18,10 @@ function Invoke-Adb {
 $root = Split-Path $PSScriptRoot -Parent
 Push-Location $root
 try {
+    $devices = & $adb devices
+    if ($LASTEXITCODE -ne 0 -or ($devices -join "`n") -notmatch "(?m)^$([regex]::Escape($Serial))\s+device\b") {
+        throw 'Abre el emulador y revisa su nombre con adb devices -l.'
+    }
     if ((Invoke-Adb -Arguments @('get-state')) -ne 'device') {
         throw 'Selected device is not ready. Check adb devices -l.'
     }

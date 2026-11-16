@@ -31,12 +31,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.ColumnScope
+import com.example.thevault.ui.theme.VaultHeroStart
+import com.example.thevault.ui.theme.VaultHeroEnd
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.thevault.R
 import com.example.thevault.data.model.CredentialCategory
-import com.example.thevault.ui.theme.VaultSuccess
 
 @Composable
 fun VaultLogo(modifier: Modifier = Modifier, contentDescription: String = "Logo de TheVault") {
@@ -113,17 +117,37 @@ fun categoryIcon(category: CredentialCategory): ImageVector = when (category) {
 
 @Composable
 fun CategoryIcon(category: CredentialCategory, modifier: Modifier = Modifier) {
+    val accent = when (category) {
+        CredentialCategory.PERSONAL -> MaterialTheme.colorScheme.primary
+        CredentialCategory.WORK -> MaterialTheme.colorScheme.secondary
+        CredentialCategory.STUDIES -> MaterialTheme.colorScheme.tertiary
+        CredentialCategory.SHOPPING -> MaterialTheme.colorScheme.error
+    }
     Box(
         modifier = modifier.size(48.dp).clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(accent.copy(alpha = 0.12f)),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = categoryIcon(category),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = accent,
             modifier = Modifier.size(24.dp)
         )
+    }
+}
+
+@Composable
+fun VaultHero(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Box(
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
+            .background(Brush.linearGradient(listOf(VaultHeroStart, VaultHeroEnd)))
+    ) {
+        Box(
+            Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp)
+                .size(112.dp).clip(RoundedCornerShape(56.dp)).background(Color.White.copy(alpha = 0.05f))
+        )
+        Column(Modifier.fillMaxWidth().padding(24.dp), content = content)
     }
 }
 
@@ -140,7 +164,7 @@ fun PasswordStrength(password: String, modifier: Modifier = Modifier) {
         2, 3 -> "Media"
         else -> "Fuerte"
     }
-    val color = if (score >= 3) VaultSuccess else MaterialTheme.colorScheme.error
+    val color = if (score >= 3) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -165,7 +189,7 @@ fun InfoCard(icon: ImageVector, title: String, body: String, modifier: Modifier 
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),

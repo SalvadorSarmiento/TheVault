@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,9 +19,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -30,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import com.example.thevault.ui.components.VaultHero
 import com.example.thevault.data.model.Credential
 import com.example.thevault.ui.components.CategoryIcon
 import com.example.thevault.ui.components.VaultLogo
@@ -50,21 +54,40 @@ fun VaultListScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = state.categoryFilter?.label ?: "Mi bóveda",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "${credentials.size} ${if (credentials.size == 1) "credencial" else "credenciales"} · En este dispositivo",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            VaultHero {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("TU ESPACIO PERSONAL", style = MaterialTheme.typography.labelSmall, color = Color(0xFFCFC2F8))
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = state.categoryFilter?.label ?: "Mi bóveda",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = Color.White
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Todo a mano. Solo para ti.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFE1D7FF)
+                        )
+                    }
+                    Box(
+                        Modifier.size(48.dp).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color(0xFF98F2CF))
+                    }
                 }
-                IconButton(onClick = {}) {
-                    Icon(Icons.Outlined.Lock, contentDescription = "Bóveda desbloqueada")
+                Spacer(Modifier.height(24.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                    Column {
+                        Text("${state.credentials.size}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                        Text("Cuentas guardadas", style = MaterialTheme.typography.labelMedium, color = Color(0xFFD9CEF8))
+                    }
+                    Column {
+                        Text("${state.credentials.count { it.isFavorite }}", style = MaterialTheme.typography.headlineMedium, color = Color(0xFF98F2CF))
+                        Text("Favoritas", style = MaterialTheme.typography.labelMedium, color = Color(0xFFD9CEF8))
+                    }
                 }
             }
         }
@@ -76,7 +99,7 @@ fun VaultListScreen(
                 placeholder = { Text("Buscar credencial") },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(18.dp)
             )
         }
         item {
@@ -92,7 +115,7 @@ fun VaultListScreen(
         }
         item {
             Text(
-                if (state.query.isBlank()) "Recientes" else "Resultados",
+                if (state.query.isBlank()) "Tus cuentas" else "Resultados",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
@@ -114,12 +137,12 @@ fun VaultListScreen(
 private fun CredentialRow(credential: Credential, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -140,7 +163,10 @@ private fun CredentialRow(credential: Credential, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Icon(Icons.Outlined.ChevronRight, contentDescription = "Abrir ${credential.name}")
+            if (credential.isFavorite) {
+                Icon(Icons.Outlined.Star, contentDescription = "Favorita", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(18.dp))
+            }
+            Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -148,7 +174,7 @@ private fun CredentialRow(credential: Credential, onClick: () -> Unit) {
 @Composable
 private fun EmptyVaultState(hasSearch: Boolean) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 72.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (hasSearch) {

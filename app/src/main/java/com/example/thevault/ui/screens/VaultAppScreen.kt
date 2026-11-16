@@ -12,7 +12,11 @@ import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.VpnKey
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -59,7 +63,11 @@ fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (isTopLevel) {
-                NavigationBar {
+                NavigationBar(
+                    modifier = Modifier.clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp
+                ) {
                     navigationItems.forEach { item ->
                         NavigationBarItem(
                             selected = state.destination == item.destination,
@@ -76,9 +84,14 @@ fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
         },
         floatingActionButton = {
             if (state.destination == VaultDestination.VAULT) {
-                FloatingActionButton(onClick = viewModel::startCreate) {
-                    Icon(Icons.Outlined.Add, contentDescription = "Añadir credencial")
-                }
+                ExtendedFloatingActionButton(
+                    onClick = viewModel::startCreate,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(20.dp),
+                    icon = { Icon(Icons.Outlined.Add, contentDescription = "Añadir credencial") },
+                    text = { Text("Nueva cuenta") }
+                )
             }
         }
     ) { padding ->
