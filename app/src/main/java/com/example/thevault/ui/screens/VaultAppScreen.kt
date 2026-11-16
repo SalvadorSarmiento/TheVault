@@ -136,7 +136,8 @@ fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
                     draft = state.draft,
                     onBack = viewModel::onBack,
                     onDraftChange = viewModel::updateDraft,
-                    onSave = viewModel::saveDraft
+                    onSave = viewModel::saveDraft,
+                    isSaving = state.isSaving
                 )
             }
         }

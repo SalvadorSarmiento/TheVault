@@ -225,7 +225,8 @@ fun CredentialEditorScreen(
     draft: CredentialDraft,
     onBack: () -> Unit,
     onDraftChange: ((CredentialDraft) -> CredentialDraft) -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    isSaving: Boolean = false
 ) {
     var categoryMenuOpen by remember { mutableStateOf(false) }
     val isEditing = draft.id != null
@@ -331,7 +332,8 @@ fun CredentialEditorScreen(
             Spacer(Modifier.height(8.dp))
             VaultPrimaryButton(
                 text = if (isEditing) "Guardar cambios" else "Guardar credencial",
-                onClick = onSave
+                onClick = onSave,
+                loading = isSaving
             )
         }
     }

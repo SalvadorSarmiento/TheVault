@@ -20,6 +20,9 @@ import com.google.firebase.auth.FirebaseAuth
 import java.security.GeneralSecurityException
 import java.security.SecureRandom
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 enum class VaultDestination { VAULT, GENERATOR, CATEGORIES, SETTINGS, DETAIL, EDITOR }
 enum class VaultFilter(val label: String) { ALL("Todas"), FAVORITES("Favoritos"), WORK("Trabajo") }
@@ -56,11 +59,21 @@ data class VaultUiState(
     val isUnlocked: Boolean = false,
     val isUnlocking: Boolean = false,
     val isSyncing: Boolean = false,
+    val isSaving: Boolean = false,
     val message: String? = null
 )
 
-class VaultViewModel(
-    application: Application
+class VaultViewModel @JvmOverloads constructor(
+    application: Application,
+    private val localRepositoryFactory: (Application, () -> String, MigratingCredentialCipher) -> VaultRepository =
+        { app, owner, cipher -> RoomVaultRepository(app, owner, cipher) },
+    private val remoteRepositoryFactory: (MigratingCredentialCipher) -> RemoteVaultRepository = { cipher ->
+        HttpRemoteVaultRepository(
+            baseUrl = BuildConfig.API_BASE_URL,
+            tokenProvider = if (BuildConfig.FIREBASE_CONFIGURED) FirebaseIdTokenProvider() else DevelopmentTokenProvider(),
+            crypto = cipher
+        )
+    }
 ) : AndroidViewModel(application) {
 
     private var repository: VaultRepository? = null
@@ -68,6 +81,8 @@ class VaultViewModel(
     private var crypto: MigratingCredentialCipher? = null
     private var sessionVersion = 0L
     private val passwordRandom = SecureRandom()
+    // Guardar y sincronizar comparten turno para no crear la misma cuenta dos veces.
+    private val operationMutex = Mutex()
 
     var uiState by mutableStateOf(VaultUiState())
         private set
@@ -84,38 +99,29 @@ class VaultViewModel(
         masterPassword.fill('\u0000')
         crypto = sessionCrypto
 
-        val localRepository = RoomVaultRepository(
-            context = app,
-            ownerIdProvider = ::currentOwnerId,
-            crypto = sessionCrypto
-        )
-        val httpRepository = HttpRemoteVaultRepository(
-            baseUrl = BuildConfig.API_BASE_URL,
-            tokenProvider = if (BuildConfig.FIREBASE_CONFIGURED) {
-                FirebaseIdTokenProvider()
-            } else {
-                DevelopmentTokenProvider()
-            },
-            crypto = sessionCrypto
-        )
+        val localRepository = localRepositoryFactory(app, ::currentOwnerId, sessionCrypto)
+        val httpRepository = remoteRepositoryFactory(sessionCrypto)
         repository = localRepository
         remoteRepository = httpRepository
         uiState = uiState.copy(isUnlocking = true, message = null)
 
         viewModelScope.launch {
-            val localCredentials = runCatching { localRepository.getCredentials() }
-                .getOrElse { error ->
-                    failUnlock(version, error, onFailure)
-                    return@launch
-                }
-            if (version != sessionVersion) return@launch
+            operationMutex.withLock {
+                if (version != sessionVersion) return@launch
+                val localCredentials = runCatching { localRepository.getCredentials() }
+                    .getOrElse { error ->
+                        failUnlock(version, error, onFailure)
+                        return@launch
+                    }
+                if (version != sessionVersion) return@launch
 
-            uiState = uiState.copy(
-                credentials = localCredentials,
-                isUnlocked = true,
-                isUnlocking = false
-            )
-            syncFromRemote(version, onFailure)
+                uiState = uiState.copy(
+                    credentials = localCredentials,
+                    isUnlocked = true,
+                    isUnlocking = false
+                )
+                syncFromRemote(version, onFailure)
+            }
         }
     }
 
@@ -203,57 +209,71 @@ class VaultViewModel(
     }
 
     fun saveDraft() {
+        if (uiState.isSaving || uiState.destination != VaultDestination.EDITOR) return
         val draft = uiState.draft.copy(submitted = true)
         uiState = uiState.copy(draft = draft)
         if (draft.name.isBlank() || draft.username.isBlank() || draft.password.isBlank()) return
 
-        val current = draft.id?.let { id -> uiState.credentials.firstOrNull { it.id == id } }
-        val credential = Credential(
-            id = draft.id ?: 0L,
-            remoteId = current?.remoteId,
-            name = draft.name.trim(),
-            username = draft.username.trim(),
-            password = draft.password,
-            website = draft.website.trim(),
-            notes = draft.notes.trim(),
-            category = draft.category,
-            isFavorite = draft.isFavorite
-        )
         val localRepository = repository ?: return
         val version = sessionVersion
+        uiState = uiState.copy(isSaving = true)
         viewModelScope.launch {
-            runCatching {
-                val saved = localRepository.saveCredential(credential)
-                if (version != sessionVersion) return@launch
-                uiState = uiState.copy(
-                    credentials = localRepository.getCredentials(),
-                    selectedCredentialId = saved.id,
-                    destination = VaultDestination.DETAIL,
-                    message = if (draft.id == null) "Credencial agregada" else "Cambios guardados"
-                )
-                synchronizeCredential(saved, version)
-            }.onFailure { error ->
+            try {
+                operationMutex.withLock {
+                    if (version != sessionVersion) return@launch
+                    val current = draft.id?.let { id -> uiState.credentials.firstOrNull { it.id == id } }
+                    val credential = Credential(
+                        id = draft.id ?: 0L,
+                        remoteId = current?.remoteId,
+                        name = draft.name.trim(),
+                        username = draft.username.trim(),
+                        password = draft.password,
+                        website = draft.website.trim(),
+                        notes = draft.notes.trim(),
+                        category = draft.category,
+                        isFavorite = draft.isFavorite
+                    )
+                    val saved = localRepository.saveCredential(credential)
+                    if (version != sessionVersion) return@launch
+                    uiState = uiState.copy(
+                        credentials = localRepository.getCredentials(),
+                        selectedCredentialId = saved.id,
+                        draft = draft.copy(id = saved.id),
+                        destination = VaultDestination.DETAIL,
+                        message = if (draft.id == null) "Credencial agregada" else "Cambios guardados"
+                    )
+                    synchronizeCredential(saved, version)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 if (version == sessionVersion) {
                     uiState = uiState.copy(message = error.userMessage("No se pudo guardar la credencial"))
                 }
+            } finally {
+                if (version == sessionVersion) uiState = uiState.copy(isSaving = false)
             }
         }
     }
 
     fun toggleFavorite() {
-        val credential = selectedCredential ?: return
-        val updated = credential.copy(isFavorite = !credential.isFavorite)
+        val id = selectedCredential?.id ?: return
         val localRepository = repository ?: return
         val version = sessionVersion
         viewModelScope.launch {
-            runCatching {
-                localRepository.saveCredential(updated)
+            operationMutex.withLock {
                 if (version != sessionVersion) return@launch
-                uiState = uiState.copy(credentials = localRepository.getCredentials())
-                synchronizeCredential(updated, version)
-            }.onFailure { error ->
-                if (version == sessionVersion) {
-                    uiState = uiState.copy(message = error.userMessage("No se pudo actualizar"))
+                runCatching {
+                    val credential = localRepository.getCredentials().firstOrNull { it.id == id } ?: return@launch
+                    val updated = credential.copy(isFavorite = !credential.isFavorite)
+                    localRepository.saveCredential(updated)
+                    if (version != sessionVersion) return@launch
+                    uiState = uiState.copy(credentials = localRepository.getCredentials())
+                    synchronizeCredential(updated, version)
+                }.onFailure { error ->
+                    if (version == sessionVersion) {
+                        uiState = uiState.copy(message = error.userMessage("No se pudo actualizar"))
+                    }
                 }
             }
         }
@@ -268,28 +288,32 @@ class VaultViewModel(
     }
 
     fun deleteSelected() {
-        val credential = selectedCredential ?: return
+        val id = selectedCredential?.id ?: return
         val localRepository = repository ?: return
         val httpRepository = remoteRepository ?: return
         val version = sessionVersion
         viewModelScope.launch {
-            runCatching {
-                credential.remoteId?.let { httpRepository.deleteCredential(it) }
-                localRepository.deleteCredential(credential.id)
+            operationMutex.withLock {
                 if (version != sessionVersion) return@launch
-                uiState = uiState.copy(
-                    credentials = localRepository.getCredentials(),
-                    selectedCredentialId = null,
-                    showDeleteDialog = false,
-                    destination = VaultDestination.VAULT,
-                    message = "Credencial eliminada"
-                )
-            }.onFailure { error ->
-                if (version == sessionVersion) {
+                runCatching {
+                    val credential = localRepository.getCredentials().firstOrNull { it.id == id } ?: return@launch
+                    credential.remoteId?.let { httpRepository.deleteCredential(it) }
+                    localRepository.deleteCredential(credential.id)
+                    if (version != sessionVersion) return@launch
                     uiState = uiState.copy(
+                        credentials = localRepository.getCredentials(),
+                        selectedCredentialId = null,
                         showDeleteDialog = false,
-                        message = error.userMessage("No se pudo eliminar; no se realizaron cambios")
+                        destination = VaultDestination.VAULT,
+                        message = "Credencial eliminada"
                     )
+                }.onFailure { error ->
+                    if (version == sessionVersion) {
+                        uiState = uiState.copy(
+                            showDeleteDialog = false,
+                            message = error.userMessage("No se pudo eliminar; no se realizaron cambios")
+                        )
+                    }
                 }
             }
         }
@@ -304,15 +328,19 @@ class VaultViewModel(
             val remoteCredentials = httpRepository.getCredentials()
             if (version != sessionVersion) return
             val localCredentials = localRepository.getCredentials()
+            val byRemoteId = localCredentials.filter { !it.remoteId.isNullOrBlank() }
+                .associateBy { it.remoteId }.toMutableMap()
 
             remoteCredentials.forEach { remote ->
-                val local = localCredentials.firstOrNull { it.remoteId == remote.remoteId }
-                localRepository.saveCredential(remote.copy(id = local?.id ?: 0L))
+                check(!remote.remoteId.isNullOrBlank()) { "La API no devolvió el identificador de la cuenta" }
+                val local = byRemoteId[remote.remoteId]
+                byRemoteId[remote.remoteId] = localRepository.saveCredential(remote.copy(id = local?.id ?: 0L))
             }
 
-            localCredentials.filter { it.remoteId == null }.forEach { pending ->
+            localRepository.getCredentials().filter { it.remoteId.isNullOrBlank() }.forEach { pending ->
                 val synchronized = httpRepository.saveCredential(pending)
-                localRepository.saveCredential(synchronized)
+                check(!synchronized.remoteId.isNullOrBlank()) { "La API no devolvió el identificador de la cuenta" }
+                localRepository.saveCredential(synchronized.copy(id = pending.id))
             }
 
             if (version == sessionVersion) {
@@ -408,10 +436,10 @@ class VaultViewModel(
         runCatching { httpRepository.saveCredential(credential) }
             .onSuccess { synchronized ->
                 if (version != sessionVersion) return
-                localRepository.saveCredential(synchronized)
+                check(!synchronized.remoteId.isNullOrBlank()) { "La API no devolvió el identificador de la cuenta" }
+                localRepository.saveCredential(synchronized.copy(id = credential.id))
                 uiState = uiState.copy(
                     credentials = localRepository.getCredentials(),
-                    selectedCredentialId = synchronized.id,
                     message = "Cambios sincronizados"
                 )
             }
