@@ -75,7 +75,9 @@ fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
                             icon = { Icon(item.icon, contentDescription = item.label) },
                             label = { androidx.compose.material3.Text(item.label) },
                             colors = NavigationBarItemDefaults.colors(
-                                indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.primary
                             )
                         )
                     }

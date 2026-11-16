@@ -16,6 +16,7 @@ import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
 import com.example.thevault.ui.auth.AuthUiState
 import com.example.thevault.ui.screens.LoginScreen
+import com.example.thevault.ui.screens.SplashScreen
 import com.example.thevault.ui.screens.VaultListScreen
 import com.example.thevault.ui.theme.TheVaultTheme
 import com.example.thevault.ui.vault.VaultUiState
@@ -26,6 +27,8 @@ import org.junit.Test
 // Imágenes de revisión con cuentas ficticias. No abre la bóveda real.
 class VistasDisenoTest {
     @get:Rule val vista = createComposeRule()
+
+    @Test fun bienvenida() = guardar("bienvenida", false) { SplashScreen() }
 
     @Test fun inicio() = guardar("inicio", false) {
         LoginScreen(AuthUiState(showSplash = false), {}, {}, {}, {})

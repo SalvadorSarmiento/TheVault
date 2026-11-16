@@ -121,7 +121,7 @@ fun CategoryIcon(category: CredentialCategory, modifier: Modifier = Modifier) {
         CredentialCategory.PERSONAL -> MaterialTheme.colorScheme.primary
         CredentialCategory.WORK -> MaterialTheme.colorScheme.secondary
         CredentialCategory.STUDIES -> MaterialTheme.colorScheme.tertiary
-        CredentialCategory.SHOPPING -> MaterialTheme.colorScheme.error
+        CredentialCategory.SHOPPING -> MaterialTheme.colorScheme.primary
     }
     Box(
         modifier = modifier.size(48.dp).clip(RoundedCornerShape(14.dp))

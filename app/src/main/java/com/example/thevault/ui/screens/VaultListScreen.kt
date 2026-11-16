@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -32,7 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
+import com.example.thevault.ui.theme.VaultHeroText
+import com.example.thevault.ui.theme.VaultHeroMuted
+import com.example.thevault.ui.theme.VaultHeroAccent
 import com.example.thevault.ui.components.VaultHero
 import com.example.thevault.data.model.Credential
 import com.example.thevault.ui.components.CategoryIcon
@@ -57,36 +60,36 @@ fun VaultListScreen(
             VaultHero {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("TU ESPACIO PERSONAL", style = MaterialTheme.typography.labelSmall, color = Color(0xFFCFC2F8))
+                        Text("TU ESPACIO PERSONAL", style = MaterialTheme.typography.labelSmall, color = VaultHeroMuted)
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = state.categoryFilter?.label ?: "Mi bóveda",
                             style = MaterialTheme.typography.headlineLarge,
-                            color = Color.White
+                            color = VaultHeroText
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
                             "Todo a mano. Solo para ti.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFE1D7FF)
+                            color = VaultHeroMuted
                         )
                     }
                     Box(
-                        Modifier.size(48.dp).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp)),
+                        Modifier.size(48.dp).background(VaultHeroText.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Outlined.Lock, contentDescription = null, tint = Color(0xFF98F2CF))
+                        Icon(Icons.Outlined.Lock, contentDescription = null, tint = VaultHeroAccent)
                     }
                 }
                 Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                     Column {
-                        Text("${state.credentials.size}", style = MaterialTheme.typography.headlineMedium, color = Color.White)
-                        Text("Cuentas guardadas", style = MaterialTheme.typography.labelMedium, color = Color(0xFFD9CEF8))
+                        Text("${state.credentials.size}", style = MaterialTheme.typography.headlineMedium, color = VaultHeroText)
+                        Text("Cuentas guardadas", style = MaterialTheme.typography.labelMedium, color = VaultHeroMuted)
                     }
                     Column {
-                        Text("${state.credentials.count { it.isFavorite }}", style = MaterialTheme.typography.headlineMedium, color = Color(0xFF98F2CF))
-                        Text("Favoritas", style = MaterialTheme.typography.labelMedium, color = Color(0xFFD9CEF8))
+                        Text("${state.credentials.count { it.isFavorite }}", style = MaterialTheme.typography.headlineMedium, color = VaultHeroAccent)
+                        Text("Favoritas", style = MaterialTheme.typography.labelMedium, color = VaultHeroMuted)
                     }
                 }
             }
@@ -108,7 +111,11 @@ fun VaultListScreen(
                     FilterChip(
                         selected = state.categoryFilter == null && state.filter == filter,
                         onClick = { onFilterChange(filter) },
-                        label = { Text(filter.label) }
+                        label = { Text(filter.label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     )
                 }
             }

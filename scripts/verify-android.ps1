@@ -51,7 +51,10 @@ try {
         throw 'Instrumented tests failed.'
     }
 } catch {
-    & $adb -s $Serial logcat -d -t 200 -s AndroidRuntime:E
+    $connectedDevices = & $adb devices
+    if (($connectedDevices -join "`n") -match "(?m)^$([regex]::Escape($Serial))\s+device\b") {
+        & $adb -s $Serial logcat -d -t 200 -s AndroidRuntime:E
+    }
     throw
 } finally {
     Pop-Location

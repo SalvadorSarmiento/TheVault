@@ -36,7 +36,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
+import com.example.thevault.ui.theme.VaultHeroText
+import com.example.thevault.ui.theme.VaultHeroMuted
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
@@ -82,15 +83,15 @@ fun LoginScreen(
     ) {
         VaultHero {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                    Icon(painterResource(R.drawable.ic_vault_logo), contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(VaultHeroText.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
+                    Icon(painterResource(R.drawable.ic_vault_logo), contentDescription = null, tint = VaultHeroText, modifier = Modifier.size(28.dp))
                 }
-                Text("TheVault", style = MaterialTheme.typography.titleLarge, color = Color.White)
+                Text("TheVault", style = MaterialTheme.typography.titleLarge, color = VaultHeroText)
             }
             Spacer(Modifier.height(24.dp))
-            Text("Tu mundo digital,\nbien protegido.", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+            Text("Tu mundo digital,\nbien protegido.", style = MaterialTheme.typography.headlineMedium, color = VaultHeroText)
             Spacer(Modifier.height(12.dp))
-            Text("Tus cuentas. Tu espacio. Tu tranquilidad.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFE1D7FF))
+            Text("Tus cuentas. Tu espacio. Tu tranquilidad.", style = MaterialTheme.typography.bodyMedium, color = VaultHeroMuted)
         }
         Spacer(Modifier.height(28.dp))
         Text("Inicia sesión", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.fillMaxWidth())

@@ -36,7 +36,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.graphics.Color
+import com.example.thevault.ui.theme.VaultHeroText
+import com.example.thevault.ui.theme.VaultHeroMuted
+import com.example.thevault.ui.theme.VaultHeroAccent
 import com.example.thevault.ui.components.VaultHero
 import androidx.compose.ui.unit.dp
 import com.example.thevault.data.model.Credential
@@ -65,15 +67,15 @@ fun PasswordGeneratorScreen(state: VaultUiState, viewModel: VaultViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("UNA LLAVE NUEVA", style = MaterialTheme.typography.labelSmall, color = Color(0xFFD9CEF8))
+                        Text("UNA LLAVE NUEVA", style = MaterialTheme.typography.labelSmall, color = VaultHeroMuted)
                         Spacer(Modifier.height(10.dp))
-                        Text(state.generatedPassword, style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace, color = Color.White)
+                        Text(state.generatedPassword, style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace, color = VaultHeroText)
                     }
                     IconButton(onClick = {
                         clipboard.setText(AnnotatedString(state.generatedPassword))
                         viewModel.showMessage("Contraseña copiada")
                     }) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copiar contraseña", tint = Color(0xFF98F2CF))
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copiar contraseña", tint = VaultHeroAccent)
                     }
                 }
             }
