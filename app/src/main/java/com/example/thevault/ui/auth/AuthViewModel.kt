@@ -6,139 +6,179 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.thevault.BuildConfig
-import com.example.thevault.data.auth.awaitResult
-import com.google.firebase.auth.FirebaseAuth
+import com.example.thevault.data.auth.LocalAccessService
+import com.example.thevault.data.auth.LocalSession
+import com.example.thevault.data.auth.PendingAccount
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+
+enum class AuthStage { LOGIN, REGISTER, RECOVERY_KEY, RECOVER }
 
 data class AuthUiState(
     val showSplash: Boolean = true,
+    val stage: AuthStage = AuthStage.LOGIN,
     val email: String = "",
     val password: String = "",
+    val confirmation: String = "",
+    val recoveryCode: String = "",
+    val recoveryInput: String = "",
+    val keyNoted: Boolean = false,
+    val hasLegacyVault: Boolean = false,
+    val importLegacy: Boolean = false,
+    val oldPassword: String = "",
+    val accountId: String? = null,
     val showPassword: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
     val isAuthenticated: Boolean = false
-)
+) {
+    override fun toString() = "AuthUiState(stage=$stage, loading=$isLoading)"
+}
 
-class AuthViewModel(application: Application) : AndroidViewModel(application) {
-    private var pendingVaultPassword: CharArray? = null
-
+class AuthViewModel @JvmOverloads constructor(
+    application: Application,
+    private val access: LocalAccessService = LocalAccessService(application)
+) : AndroidViewModel(application) {
+    private var pendingAccount: PendingAccount? = null
+    private var pendingSession: LocalSession? = null
+    private var legacyPassword: CharArray? = null
     var uiState by mutableStateOf(AuthUiState())
         private set
 
     init {
         viewModelScope.launch {
-            delay(1_400)
-            uiState = uiState.copy(
-                showSplash = false,
-                email = if (BuildConfig.FIREBASE_CONFIGURED) {
-                    FirebaseAuth.getInstance().currentUser?.email.orEmpty()
-                } else {
-                    uiState.email
-                },
-                isAuthenticated = false
-            )
+            try {
+                val (exists, legacy) = withContext(Dispatchers.IO) {
+                    access.accounts.hasAccounts() to access.hasLegacyVault()
+                }
+                delay(1_000)
+                uiState = uiState.copy(showSplash = false, stage = if (exists) AuthStage.LOGIN else AuthStage.REGISTER,
+                    hasLegacyVault = legacy, importLegacy = legacy)
+            } catch (_: Exception) {
+                uiState = uiState.copy(showSplash = false, error = "No se pudo leer el acceso local. No borres los datos de la app.")
+            }
         }
     }
 
-    fun onEmailChange(value: String) {
-        uiState = uiState.copy(email = value, error = null)
-    }
+    fun onEmailChange(value: String) { if (!uiState.isLoading) uiState = uiState.copy(email = value.take(254), error = null) }
+    fun onPasswordChange(value: String) { if (!uiState.isLoading) uiState = uiState.copy(password = value.take(256), error = null) }
+    fun onConfirmationChange(value: String) { if (!uiState.isLoading) uiState = uiState.copy(confirmation = value.take(256), error = null) }
+    fun onRecoveryChange(value: String) { if (!uiState.isLoading) uiState = uiState.copy(recoveryInput = value.take(100), error = null) }
+    fun onOldPasswordChange(value: String) { if (!uiState.isLoading) uiState = uiState.copy(oldPassword = value.take(256), error = null) }
+    fun onImportChange(value: Boolean) { if (!uiState.isLoading) uiState = uiState.copy(importLegacy = value, error = null) }
+    fun onKeyNoted(value: Boolean) { if (!uiState.isLoading) uiState = uiState.copy(keyNoted = value, error = null) }
+    fun togglePasswordVisibility() { uiState = uiState.copy(showPassword = !uiState.showPassword) }
 
-    fun onPasswordChange(value: String) {
-        uiState = uiState.copy(password = value, error = null)
-    }
-
-    fun togglePasswordVisibility() {
-        uiState = uiState.copy(showPassword = !uiState.showPassword)
+    fun changeStage(stage: AuthStage) {
+        if (uiState.isLoading) return
+        clearPending()
+        uiState = AuthUiState(showSplash = false, stage = stage, email = uiState.email,
+            hasLegacyVault = uiState.hasLegacyVault, importLegacy = uiState.hasLegacyVault)
     }
 
     fun login() {
-        if (uiState.email.isBlank() || uiState.password.isBlank()) {
-            uiState = uiState.copy(error = "Completa el correo y la contraseña.")
-            return
-        }
-
-        uiState = uiState.copy(isLoading = true, error = null)
-        val email = uiState.email.trim()
-        val password = uiState.password
-        val vaultPassword = password.toCharArray()
-        viewModelScope.launch {
-            if (BuildConfig.FIREBASE_CONFIGURED) {
-                runCatching {
-                    FirebaseAuth.getInstance()
-                        .signInWithEmailAndPassword(email, password)
-                        .awaitResult()
-                }.onSuccess {
-                    replacePendingVaultPassword(vaultPassword)
-                    uiState = uiState.copy(
-                        isLoading = false,
-                        isAuthenticated = true,
-                        password = ""
-                    )
-                }.onFailure { error ->
-                    vaultPassword.fill('\u0000')
-                    uiState = uiState.copy(
-                        isLoading = false,
-                        error = error.localizedMessage ?: "No se pudo iniciar sesión con Firebase."
-                    )
-                }
-            } else {
-                delay(350)
-                val isValid = email.equals(DEMO_EMAIL, ignoreCase = true) &&
-                    password == DEMO_PASSWORD
-                uiState = if (isValid) {
-                    replacePendingVaultPassword(vaultPassword)
-                    uiState.copy(isLoading = false, isAuthenticated = true, password = "")
-                } else {
-                    vaultPassword.fill('\u0000')
-                    uiState.copy(
-                        isLoading = false,
-                        error = "Correo o contraseña incorrectos. Usa el acceso de demostración."
-                    )
+        if (uiState.isLoading) return
+        when (uiState.stage) {
+            AuthStage.REGISTER -> register()
+            AuthStage.RECOVERY_KEY -> confirmKey()
+            AuthStage.RECOVER -> recover()
+            AuthStage.LOGIN -> {
+                val email = uiState.email
+                val password = uiState.password.toCharArray()
+                work {
+                    try { authenticated(withContext(Dispatchers.IO) { access.login(email, password) }) }
+                    finally { password.fill('\u0000') }
                 }
             }
         }
     }
 
-    fun logout() {
-        pendingVaultPassword?.fill('\u0000')
-        pendingVaultPassword = null
-        if (BuildConfig.FIREBASE_CONFIGURED) {
-            FirebaseAuth.getInstance().signOut()
+    private fun matchingPassword(): Boolean {
+        if (uiState.password != uiState.confirmation) {
+            uiState = uiState.copy(error = "Las contraseñas no coinciden.")
+            return false
         }
-        uiState = AuthUiState(showSplash = false)
+        return true
     }
 
-    fun consumeVaultPassword(): CharArray? = pendingVaultPassword.also {
-        pendingVaultPassword = null
+    private fun register() {
+        if (!matchingPassword()) return
+        if (uiState.importLegacy && uiState.oldPassword.isBlank()) {
+            uiState = uiState.copy(error = "Escribe la contraseña de la bóveda anterior para conservarla.")
+            return
+        }
+        val email = uiState.email
+        val password = uiState.password.toCharArray()
+        legacyPassword?.fill('\u0000')
+        legacyPassword = uiState.oldPassword.takeIf { uiState.importLegacy }?.toCharArray()
+        work {
+            try {
+                val pending = withContext(Dispatchers.IO) { access.accounts.prepare(email, password) }
+                pendingAccount = pending
+                uiState = uiState.copy(stage = AuthStage.RECOVERY_KEY, email = pending.email,
+                    recoveryCode = pending.recoveryCode, password = "", confirmation = "", oldPassword = "")
+            } finally { password.fill('\u0000') }
+        }
     }
 
-    fun rejectVaultUnlock(message: String) {
-        pendingVaultPassword?.fill('\u0000')
-        pendingVaultPassword = null
-        uiState = uiState.copy(
-            isAuthenticated = false,
-            isLoading = false,
-            password = "",
-            error = message
-        )
+    private fun confirmKey() {
+        val pending = pendingAccount ?: return
+        if (!uiState.keyNoted || uiState.recoveryInput.trim().uppercase() != pending.recoveryCode.takeLast(8)) {
+            uiState = uiState.copy(error = "Confirma que la anotaste y escribe los últimos 8 caracteres de la clave.")
+            return
+        }
+        work {
+            val session = withContext(Dispatchers.IO) { access.complete(pending, legacyPassword) }
+            val legacyRemaining = withContext(Dispatchers.IO) { access.hasLegacyVault() }
+            uiState = uiState.copy(hasLegacyVault = legacyRemaining)
+            pendingAccount = null
+            legacyPassword?.fill('\u0000'); legacyPassword = null
+            authenticated(session)
+        }
     }
 
-    private fun replacePendingVaultPassword(password: CharArray) {
-        pendingVaultPassword?.fill('\u0000')
-        pendingVaultPassword = password
+    private fun recover() {
+        if (!matchingPassword()) return
+        val email = uiState.email
+        val recovery = uiState.recoveryInput
+        val password = uiState.password.toCharArray()
+        work {
+            try { authenticated(withContext(Dispatchers.IO) { access.recover(email, recovery, password) }) }
+            finally { password.fill('\u0000') }
+        }
     }
 
-    override fun onCleared() {
-        pendingVaultPassword?.fill('\u0000')
-        super.onCleared()
+    private fun work(block: suspend () -> Unit) {
+        uiState = uiState.copy(isLoading = true, error = null)
+        viewModelScope.launch {
+            try { block() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                uiState = uiState.copy(error = if (error is IllegalArgumentException || error is IllegalStateException)
+                    error.message ?: "No se pudo completar el acceso." else "No se pudo abrir o guardar la cuenta local.")
+            } finally { uiState = uiState.copy(isLoading = false) }
+        }
     }
 
-    companion object {
-        const val DEMO_EMAIL = "ana@ejemplo.com"
-        const val DEMO_PASSWORD = "123456"
+    private fun authenticated(session: LocalSession) {
+        pendingSession?.close()
+        pendingSession = session
+        uiState = AuthUiState(showSplash = false, email = uiState.email,
+            accountId = session.accountId, isAuthenticated = true, hasLegacyVault = uiState.hasLegacyVault)
     }
+
+    fun consumeVaultPassword(): CharArray? = pendingSession?.let { session ->
+        session.vaultPassword.copyOf().also { session.close(); pendingSession = null }
+    }
+    fun logout() { clearPending(); uiState = AuthUiState(showSplash = false, email = uiState.email, hasLegacyVault = uiState.hasLegacyVault) }
+    fun rejectVaultUnlock(message: String) { logout(); uiState = uiState.copy(error = message) }
+    private fun clearPending() {
+        pendingAccount?.close(); pendingAccount = null
+        pendingSession?.close(); pendingSession = null
+        legacyPassword?.fill('\u0000'); legacyPassword = null
+    }
+    override fun onCleared() { clearPending(); super.onCleared() }
 }

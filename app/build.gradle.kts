@@ -31,6 +31,8 @@ fun String.asBuildConfigString(): String =
     "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 
+// El acceso actual es local; la sincronización se habilitará con identidad propia.
+val cloudSyncEnabled = false
 val firebaseConfigured = file("google-services.json").exists()
 if (firebaseConfigured) {
     apply(plugin = "com.google.gms.google-services")
@@ -44,7 +46,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.thevault"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
@@ -101,6 +103,8 @@ dependencies {
 }
 
 val validateReleaseApiUrl = tasks.register("validateReleaseApiUrl") {
+    inputs.property("cloudSyncEnabled", cloudSyncEnabled)
+    onlyIf { task -> task.inputs.properties.getValue("cloudSyncEnabled") as Boolean }
     group = "verification"
     description = "Verifies that release builds use a valid HTTPS API endpoint."
     inputs.property("apiUrl", configuredApiBaseUrl.orEmpty())

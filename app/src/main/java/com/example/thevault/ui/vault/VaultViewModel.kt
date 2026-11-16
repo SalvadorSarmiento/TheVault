@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.thevault.BuildConfig
-import com.example.thevault.data.auth.DevelopmentTokenProvider
 import com.example.thevault.data.auth.FirebaseIdTokenProvider
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
@@ -16,7 +15,6 @@ import com.example.thevault.data.remote.RemoteVaultRepository
 import com.example.thevault.data.repository.RoomVaultRepository
 import com.example.thevault.data.repository.VaultRepository
 import com.example.thevault.data.security.MigratingCredentialCipher
-import com.google.firebase.auth.FirebaseAuth
 import java.security.GeneralSecurityException
 import java.security.SecureRandom
 import kotlinx.coroutines.launch
@@ -70,7 +68,7 @@ class VaultViewModel @JvmOverloads constructor(
     private val remoteRepositoryFactory: (MigratingCredentialCipher) -> RemoteVaultRepository = { cipher ->
         HttpRemoteVaultRepository(
             baseUrl = BuildConfig.API_BASE_URL,
-            tokenProvider = if (BuildConfig.FIREBASE_CONFIGURED) FirebaseIdTokenProvider() else DevelopmentTokenProvider(),
+            tokenProvider = FirebaseIdTokenProvider(),
             crypto = cipher
         )
     }
@@ -91,7 +89,12 @@ class VaultViewModel @JvmOverloads constructor(
         regeneratePassword()
     }
 
-    fun unlock(masterPassword: CharArray, onFailure: (String) -> Unit) {
+    fun unlock(masterPassword: CharArray, ownerId: String? = null, syncEnabled: Boolean = false, onFailure: (String) -> Unit) {
+        val owner = ownerId?.takeIf { it.isNotBlank() } ?: run {
+            masterPassword.fill('\u0000')
+            onFailure("Vuelve a iniciar sesión para abrir tu bóveda local.")
+            return
+        }
         val version = ++sessionVersion
         val app = getApplication<Application>()
         crypto?.close()
@@ -99,8 +102,8 @@ class VaultViewModel @JvmOverloads constructor(
         masterPassword.fill('\u0000')
         crypto = sessionCrypto
 
-        val localRepository = localRepositoryFactory(app, ::currentOwnerId, sessionCrypto)
-        val httpRepository = remoteRepositoryFactory(sessionCrypto)
+        val localRepository = localRepositoryFactory(app, { owner }, sessionCrypto)
+        val httpRepository = if (syncEnabled) remoteRepositoryFactory(sessionCrypto) else null
         repository = localRepository
         remoteRepository = httpRepository
         uiState = uiState.copy(isUnlocking = true, message = null)
@@ -290,14 +293,14 @@ class VaultViewModel @JvmOverloads constructor(
     fun deleteSelected() {
         val id = selectedCredential?.id ?: return
         val localRepository = repository ?: return
-        val httpRepository = remoteRepository ?: return
+        val httpRepository = remoteRepository
         val version = sessionVersion
         viewModelScope.launch {
             operationMutex.withLock {
                 if (version != sessionVersion) return@launch
                 runCatching {
                     val credential = localRepository.getCredentials().firstOrNull { it.id == id } ?: return@launch
-                    credential.remoteId?.let { httpRepository.deleteCredential(it) }
+                    credential.remoteId?.let { httpRepository?.deleteCredential(it) }
                     localRepository.deleteCredential(credential.id)
                     if (version != sessionVersion) return@launch
                     uiState = uiState.copy(
@@ -465,12 +468,6 @@ class VaultViewModel @JvmOverloads constructor(
         )
     }
 
-    private fun currentOwnerId(): String = if (BuildConfig.FIREBASE_CONFIGURED) {
-        FirebaseAuth.getInstance().currentUser?.uid ?: ANONYMOUS_OWNER
-    } else {
-        DEVELOPMENT_OWNER
-    }
-
     private fun Throwable.isCryptographicFailure(): Boolean =
         generateSequence(this) { it.cause }.any { it is GeneralSecurityException }
 
@@ -482,8 +479,4 @@ class VaultViewModel @JvmOverloads constructor(
         super.onCleared()
     }
 
-    private companion object {
-        const val DEVELOPMENT_OWNER = "demo"
-        const val ANONYMOUS_OWNER = "anonymous"
-    }
 }

@@ -112,7 +112,7 @@ class CortesConexionTest {
         }
 
         suspend fun abrir() {
-            principal { vm.unlock("solo-pruebas-de-cortes".toCharArray()) { fallo.set(it) } }
+            principal { vm.unlock("solo-pruebas-de-cortes".toCharArray(), ownerId = "prueba-cortes", syncEnabled = true) { fallo.set(it) } }
             esperar {
                 check(fallo.get() == null) { fallo.get().orEmpty() }
                 vm.uiState.isUnlocked && !vm.uiState.isSyncing

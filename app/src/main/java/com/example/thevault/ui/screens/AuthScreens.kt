@@ -42,7 +42,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import com.example.thevault.R
-import com.example.thevault.BuildConfig
+import com.example.thevault.ui.auth.AuthStage
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Checkbox
+import androidx.compose.ui.text.font.FontFamily
 import com.example.thevault.ui.components.VaultHero
 import com.example.thevault.ui.auth.AuthUiState
 import com.example.thevault.ui.components.VaultLogo
@@ -73,7 +76,13 @@ fun LoginScreen(
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onTogglePassword: () -> Unit,
-    onLogin: () -> Unit
+    onLogin: () -> Unit,
+    onConfirmationChange: (String) -> Unit = {},
+    onRecoveryChange: (String) -> Unit = {},
+    onKeyNoted: (Boolean) -> Unit = {},
+    onStageChange: (AuthStage) -> Unit = {},
+    onOldPasswordChange: (String) -> Unit = {},
+    onImportChange: (Boolean) -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
@@ -94,66 +103,98 @@ fun LoginScreen(
             Text("Tus cuentas. Tu espacio. Tu tranquilidad.", style = MaterialTheme.typography.bodyMedium, color = VaultHeroMuted)
         }
         Spacer(Modifier.height(28.dp))
-        Text("Inicia sesión", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.fillMaxWidth())
+        val registering = state.stage == AuthStage.REGISTER
+        val recovering = state.stage == AuthStage.RECOVER
+        val showingKey = state.stage == AuthStage.RECOVERY_KEY
+        Text(when (state.stage) {
+            AuthStage.LOGIN -> "Inicia sesión"
+            AuthStage.REGISTER -> "Crea tu cuenta"
+            AuthStage.RECOVERY_KEY -> "Anota tu clave"
+            AuthStage.RECOVER -> "Recupera tu acceso"
+        }, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
-        Text(
-            "Un solo lugar para todas tus cuentas.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(if (showingKey) "Esta clave permite recuperar tu bóveda. Guárdala en un lugar privado, fuera del teléfono."
+            else "Tu cuenta funciona en este dispositivo, sin conexión.")
+        if (registering) Text("El correo identifica tu cuenta local; no enviamos ni verificamos correos.",
+            style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(20.dp))
-        OutlinedTextField(
-            value = state.email,
-            onValueChange = onEmailChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Correo electrónico") },
-            leadingIcon = { Icon(Icons.Outlined.Email, contentDescription = null) },
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            isError = state.error != null,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
-        )
-        Spacer(Modifier.height(14.dp))
-        OutlinedTextField(
-            value = state.password,
-            onValueChange = onPasswordChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Contraseña maestra") },
-            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
-            trailingIcon = {
-                IconButton(onClick = onTogglePassword) {
-                    Icon(
-                        if (state.showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                        contentDescription = if (state.showPassword) "Ocultar contraseña" else "Mostrar contraseña"
-                    )
+        if (showingKey) {
+            Text(state.recoveryCode.replace("-", "\n"), fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer,
+                    RoundedCornerShape(16.dp)).padding(20.dp))
+            Spacer(Modifier.height(12.dp))
+            Text("Aún no hemos guardado tu cuenta. Al confirmar, también guardaremos una copia cifrada con AES-256.")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = state.keyNoted, onCheckedChange = onKeyNoted, enabled = !state.isLoading)
+                Text("Ya anoté mi clave de recuperación", modifier = Modifier.weight(1f))
+            }
+            OutlinedTextField(value = state.recoveryInput, onValueChange = onRecoveryChange,
+                label = { Text("Últimos 8 caracteres") }, singleLine = true,
+                enabled = !state.isLoading, modifier = Modifier.fillMaxWidth())
+        } else {
+            OutlinedTextField(value = state.email, onValueChange = onEmailChange,
+                modifier = Modifier.fillMaxWidth(), label = { Text("Correo electrónico") },
+                enabled = !state.isLoading, singleLine = true, shape = RoundedCornerShape(16.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next))
+            Spacer(Modifier.height(14.dp))
+            if (recovering) {
+                OutlinedTextField(value = state.recoveryInput, onValueChange = onRecoveryChange,
+                    label = { Text("Clave de recuperación completa") }, enabled = !state.isLoading,
+                    modifier = Modifier.fillMaxWidth(), visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+                Spacer(Modifier.height(14.dp))
+            }
+            OutlinedTextField(value = state.password, onValueChange = onPasswordChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(if (recovering) "Nueva contraseña maestra" else "Contraseña maestra") },
+                trailingIcon = { IconButton(onClick = onTogglePassword) {
+                    Icon(if (state.showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (state.showPassword) "Ocultar contraseña" else "Mostrar contraseña")
+                } },
+                visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                singleLine = true, enabled = !state.isLoading, shape = RoundedCornerShape(16.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+            if (registering || recovering) {
+                Spacer(Modifier.height(12.dp))
+                Text("Usa al menos 12 caracteres. Una frase larga es más fácil de recordar.")
+                OutlinedTextField(value = state.confirmation, onValueChange = onConfirmationChange,
+                    label = { Text("Confirma la contraseña") }, singleLine = true, enabled = !state.isLoading,
+                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+            }
+            if (registering && state.hasLegacyVault) {
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = state.importLegacy, onCheckedChange = onImportChange, enabled = !state.isLoading)
+                    Text("Conservar mi bóveda anterior", modifier = Modifier.weight(1f))
                 }
-            },
-            visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            isError = state.error != null,
-            supportingText = state.error?.let { error -> { Text(error) } },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)
-        )
-        Spacer(Modifier.height(22.dp))
-        VaultPrimaryButton(text = "Iniciar sesión", onClick = onLogin, loading = state.isLoading)
-        if (!BuildConfig.FIREBASE_CONFIGURED) {
-            Spacer(Modifier.height(18.dp))
-            Column(
-                modifier = Modifier.fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.shapes.medium)
-                    .padding(16.dp)
-            ) {
-                Text("Prueba la app", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text("Correo: ana@ejemplo.com", style = MaterialTheme.typography.bodyMedium)
-                Text("Contraseña: 123456", style = MaterialTheme.typography.bodyMedium)
+                if (state.importLegacy) OutlinedTextField(value = state.oldPassword, onValueChange = onOldPasswordChange,
+                    label = { Text("Contraseña de la bóveda anterior") }, singleLine = true,
+                    enabled = !state.isLoading, visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+                else Text("La bóveda anterior seguirá guardada; esta cuenta empezará vacía.")
             }
         }
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "Tu contraseña maestra es la llave de tu bóveda.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        state.error?.let { Spacer(Modifier.height(12.dp)); Text(it, color = MaterialTheme.colorScheme.error) }
+        Spacer(Modifier.height(22.dp))
+        VaultPrimaryButton(text = when (state.stage) {
+            AuthStage.LOGIN -> "Iniciar sesión"
+            AuthStage.REGISTER -> "Ver mi clave de recuperación"
+            AuthStage.RECOVERY_KEY -> "Guardar cuenta y entrar"
+            AuthStage.RECOVER -> "Cambiar contraseña y entrar"
+        }, onClick = onLogin, loading = state.isLoading)
+        if (state.stage == AuthStage.LOGIN) {
+            TextButton(onClick = { onStageChange(AuthStage.REGISTER) }, enabled = !state.isLoading) { Text("Crear cuenta local") }
+            TextButton(onClick = { onStageChange(AuthStage.RECOVER) }, enabled = !state.isLoading) { Text("Olvidé mi contraseña") }
+        } else {
+            TextButton(onClick = { onStageChange(AuthStage.LOGIN) }, enabled = !state.isLoading) {
+                Text(if (showingKey) "Cancelar registro" else "Ya tengo una cuenta")
+            }
+        }
+        if (showingKey || recovering) {
+            Text("La recuperación necesita los datos de esta app en este dispositivo. No recupera una app desinstalada ni datos borrados.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

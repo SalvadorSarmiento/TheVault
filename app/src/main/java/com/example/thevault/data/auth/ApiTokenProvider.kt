@@ -6,10 +6,6 @@ interface ApiTokenProvider {
     suspend fun idToken(): String
 }
 
-class DevelopmentTokenProvider : ApiTokenProvider {
-    override suspend fun idToken(): String = "dev:demo"
-}
-
 class FirebaseIdTokenProvider(
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
 ) : ApiTokenProvider {

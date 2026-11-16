@@ -15,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
 import com.example.thevault.ui.auth.AuthUiState
+import com.example.thevault.ui.auth.AuthStage
 import com.example.thevault.ui.screens.LoginScreen
 import com.example.thevault.ui.screens.SplashScreen
 import com.example.thevault.ui.screens.VaultListScreen
@@ -36,6 +37,16 @@ class VistasDisenoTest {
 
     @Test fun inicioOscuro() = guardar("inicio-oscuro", true) {
         LoginScreen(AuthUiState(showSplash = false), {}, {}, {}, {})
+    }
+
+    @Test fun registroLocal() = guardar("registro-local", false) {
+        LoginScreen(AuthUiState(showSplash = false, stage = AuthStage.REGISTER), {}, {}, {}, {})
+    }
+
+    @Test fun claveRecuperacion() = guardar("clave-recuperacion", false) {
+        // Clave ficticia solo para revisar el diseño.
+        LoginScreen(AuthUiState(showSplash = false, stage = AuthStage.RECOVERY_KEY,
+            recoveryCode = List(8) { "A1B2C3D4" }.joinToString("-")), {}, {}, {}, {})
     }
 
     @Test fun bovedaClara() = boveda("boveda-clara", false)

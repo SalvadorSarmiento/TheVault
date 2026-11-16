@@ -113,7 +113,7 @@ class CredencialesDuplicadasTest {
                     ApplicationProvider.getApplicationContext<Application>(),
                     { _, _, _ -> local },
                     { _ -> remoto }
-                ).also { it.unlock("solo-para-pruebas".toCharArray()) { error(it) } }
+                ).also { it.unlock("solo-para-pruebas".toCharArray(), ownerId = "prueba-duplicados", syncEnabled = true) { error(it) } }
             }
             vm = checkNotNull(modelo)
         }

@@ -223,7 +223,7 @@ fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onL
             InfoCard(
                 icon = Icons.Outlined.Storage,
                 title = "Almacenamiento local",
-                body = "Tus cuentas se guardan protegidas en este dispositivo y se sincronizan cuando hay conexión."
+                body = "Tus cuentas se guardan cifradas en este dispositivo. El acceso y la recuperación funcionan sin conexión."
             )
         }
         item {

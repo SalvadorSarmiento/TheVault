@@ -21,24 +21,9 @@ class LaunchSmokeTest {
     @Test
     fun launchReachesLogin() {
         compose.waitUntil(timeoutMillis = 15_000) {
-            compose.onAllNodesWithText("Inicia sesión").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Correo electrónico").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Inicia sesión").assertIsDisplayed()
         compose.onNodeWithText("Correo electrónico").assertIsDisplayed()
     }
 
-    @Test
-    fun demoLoginUnlocksLocalVault() {
-        assumeFalse("Requires a configured Firebase test account", BuildConfig.FIREBASE_CONFIGURED)
-        compose.waitUntil(timeoutMillis = 15_000) {
-            compose.onAllNodesWithText("Inicia sesión").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText("Correo electrónico").performTextInput("ana@ejemplo.com")
-        compose.onNodeWithText("Contraseña maestra").performTextInput("123456")
-        compose.onNodeWithText("Iniciar sesión").performScrollTo().performClick()
-        compose.waitUntil(timeoutMillis = 30_000) {
-            compose.onAllNodesWithText("Mi bóveda").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText("Mi bóveda").assertIsDisplayed()
-    }
 }

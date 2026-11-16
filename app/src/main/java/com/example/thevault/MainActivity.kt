@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun TheVaultApp(
+internal fun TheVaultApp(
     authViewModel: AuthViewModel = viewModel(),
     vaultViewModel: VaultViewModel = viewModel()
 ) {
@@ -37,12 +37,12 @@ private fun TheVaultApp(
     val vaultState = vaultViewModel.uiState
 
     LaunchedEffect(authState.isAuthenticated) {
-        if (authState.isAuthenticated) {
+        if (authState.isAuthenticated && !vaultState.isUnlocked && !vaultState.isUnlocking) {
             val masterPassword = authViewModel.consumeVaultPassword()
             if (masterPassword == null) {
                 authViewModel.rejectVaultUnlock("Vuelve a ingresar tu contraseña maestra.")
             } else {
-                vaultViewModel.unlock(masterPassword, authViewModel::rejectVaultUnlock)
+                vaultViewModel.unlock(masterPassword, ownerId = authState.accountId, onFailure = authViewModel::rejectVaultUnlock)
             }
         }
     }
@@ -55,7 +55,13 @@ private fun TheVaultApp(
                 onEmailChange = authViewModel::onEmailChange,
                 onPasswordChange = authViewModel::onPasswordChange,
                 onTogglePassword = authViewModel::togglePasswordVisibility,
-                onLogin = authViewModel::login
+                onLogin = authViewModel::login,
+                onConfirmationChange = authViewModel::onConfirmationChange,
+                onRecoveryChange = authViewModel::onRecoveryChange,
+                onKeyNoted = authViewModel::onKeyNoted,
+                onStageChange = authViewModel::changeStage,
+                onOldPasswordChange = authViewModel::onOldPasswordChange,
+                onImportChange = authViewModel::onImportChange
             )
             !vaultState.isUnlocked -> SplashScreen()
             else -> VaultAppScreen(
