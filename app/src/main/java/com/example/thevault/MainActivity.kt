@@ -61,7 +61,8 @@ internal fun TheVaultApp(
                 onKeyNoted = authViewModel::onKeyNoted,
                 onStageChange = authViewModel::changeStage,
                 onOldPasswordChange = authViewModel::onOldPasswordChange,
-                onImportChange = authViewModel::onImportChange
+                onImportChange = authViewModel::onImportChange,
+                onBack = authViewModel::back
             )
             !vaultState.isUnlocked -> SplashScreen()
             else -> VaultAppScreen(

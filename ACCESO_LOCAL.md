@@ -1,10 +1,10 @@
 # Acceso y recuperación local
 
-Al abrir la app por primera vez puedes crear tu cuenta, sin Google ni API. El correo solo identifica la cuenta en ese dispositivo. Se retiraron el acceso de prueba y el token compartido de desarrollo.
+Al abrir la app por primera vez verás una presentación breve de las cuentas, la privacidad y la recuperación. Después puedes crear tu cuenta por pasos, sin Google ni API. Si ya tienes una cuenta, entrarás directamente al inicio de sesión. El correo solo identifica la cuenta en ese dispositivo.
 
-1. Escribe tu correo y una contraseña de al menos 12 caracteres; repítela.
-2. Anota la clave de recuperación que aparece. Todavía no se guarda la cuenta.
-3. Marca que la anotaste y escribe sus últimos 8 caracteres. Al confirmar se guarda la copia cifrada y se abre la bóveda.
+1. Escribe tu correo. En la siguiente pantalla elige una contraseña de al menos 12 caracteres y repítela.
+2. Anota la clave de recuperación, de izquierda a derecha y fila por fila. Todavía no se guarda la cuenta.
+3. Pulsa «Ya la anoté». En la pantalla siguiente confirma tu copia con los últimos 8 caracteres. Al guardar se crea la cuenta y se abre la bóveda.
 4. Para volver a entrar usa tu correo y contraseña. En «Olvidé mi contraseña» puedes usar la clave completa y elegir una nueva contraseña.
 
 Es una clave de recuperación inspirada en ese tipo de experiencia; no integra Microsoft BitLocker. Cambiar la contraseña con ella conserva las credenciales. La clave también queda cifrada localmente, pero esa copia no evita tener que recordar la contraseña o conservar la clave anotada.

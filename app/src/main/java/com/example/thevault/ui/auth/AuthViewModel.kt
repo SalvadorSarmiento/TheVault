@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.thevault.data.auth.LocalAccessService
+import com.example.thevault.data.auth.LocalAccountStore
 import com.example.thevault.data.auth.LocalSession
 import com.example.thevault.data.auth.PendingAccount
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +16,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 
-enum class AuthStage { LOGIN, REGISTER, RECOVERY_KEY, RECOVER }
+enum class AuthStage {
+    WELCOME, PRIVACY, KEY_EXPLANATION, LOGIN, REGISTER, REGISTER_PASSWORD,
+    IMPORT_LEGACY, RECOVERY_KEY, CONFIRM_KEY, RECOVER, RESET_PASSWORD
+}
 
 data class AuthUiState(
     val showSplash: Boolean = true,
@@ -55,7 +59,7 @@ class AuthViewModel @JvmOverloads constructor(
                     access.accounts.hasAccounts() to access.hasLegacyVault()
                 }
                 delay(1_000)
-                uiState = uiState.copy(showSplash = false, stage = if (exists) AuthStage.LOGIN else AuthStage.REGISTER,
+                uiState = uiState.copy(showSplash = false, stage = if (exists) AuthStage.LOGIN else AuthStage.WELCOME,
                     hasLegacyVault = legacy, importLegacy = legacy)
             } catch (_: Exception) {
                 uiState = uiState.copy(showSplash = false, error = "No se pudo leer el acceso local. No borres los datos de la app.")
@@ -73,18 +77,67 @@ class AuthViewModel @JvmOverloads constructor(
     fun togglePasswordVisibility() { uiState = uiState.copy(showPassword = !uiState.showPassword) }
 
     fun changeStage(stage: AuthStage) {
-        if (uiState.isLoading) return
+        if (uiState.isLoading || stage !in setOf(AuthStage.WELCOME, AuthStage.LOGIN, AuthStage.REGISTER, AuthStage.RECOVER)) return
         clearPending()
         uiState = AuthUiState(showSplash = false, stage = stage, email = uiState.email,
             hasLegacyVault = uiState.hasLegacyVault, importLegacy = uiState.hasLegacyVault)
     }
 
+    fun back() {
+        if (uiState.isLoading) return
+        when (uiState.stage) {
+            AuthStage.WELCOME, AuthStage.LOGIN -> return
+            AuthStage.PRIVACY -> moveTo(AuthStage.WELCOME)
+            AuthStage.KEY_EXPLANATION -> moveTo(AuthStage.PRIVACY)
+            AuthStage.REGISTER -> moveTo(AuthStage.KEY_EXPLANATION)
+            AuthStage.REGISTER_PASSWORD -> moveTo(AuthStage.REGISTER)
+            AuthStage.IMPORT_LEGACY -> moveTo(AuthStage.REGISTER_PASSWORD)
+            AuthStage.RECOVERY_KEY -> {
+                clearPending()
+                uiState = uiState.copy(stage = AuthStage.REGISTER_PASSWORD, recoveryCode = "", recoveryInput = "",
+                    keyNoted = false, showPassword = false, error = null)
+            }
+            AuthStage.CONFIRM_KEY -> moveTo(AuthStage.RECOVERY_KEY)
+            AuthStage.RECOVER -> changeStage(AuthStage.LOGIN)
+            AuthStage.RESET_PASSWORD -> uiState = uiState.copy(stage = AuthStage.RECOVER,
+                password = "", confirmation = "", error = null)
+        }
+    }
+
+    private fun moveTo(stage: AuthStage) { uiState = uiState.copy(stage = stage, error = null, showPassword = false) }
+
+    private fun validEmail(): Boolean = try {
+        uiState = uiState.copy(email = LocalAccountStore.normalizeEmail(uiState.email), error = null)
+        true
+    } catch (error: IllegalArgumentException) { uiState = uiState.copy(error = error.message); false }
+
+    private fun validPassword(): Boolean {
+        if (!matchingPassword()) return false
+        val password = uiState.password.toCharArray()
+        return try { LocalAccountStore.requirePassword(password); true }
+        catch (error: IllegalArgumentException) { uiState = uiState.copy(error = error.message); false }
+        finally { password.fill('\u0000') }
+    }
+
     fun login() {
         if (uiState.isLoading) return
         when (uiState.stage) {
-            AuthStage.REGISTER -> register()
-            AuthStage.RECOVERY_KEY -> confirmKey()
-            AuthStage.RECOVER -> recover()
+            AuthStage.WELCOME -> moveTo(AuthStage.PRIVACY)
+            AuthStage.PRIVACY -> moveTo(AuthStage.KEY_EXPLANATION)
+            AuthStage.KEY_EXPLANATION -> moveTo(AuthStage.REGISTER)
+            AuthStage.REGISTER -> if (validEmail()) moveTo(AuthStage.REGISTER_PASSWORD)
+            AuthStage.REGISTER_PASSWORD -> if (validPassword()) {
+                if (uiState.hasLegacyVault) moveTo(AuthStage.IMPORT_LEGACY) else register()
+            }
+            AuthStage.IMPORT_LEGACY -> register()
+            AuthStage.RECOVERY_KEY -> moveTo(AuthStage.CONFIRM_KEY)
+            AuthStage.CONFIRM_KEY -> confirmKey()
+            AuthStage.RECOVER -> if (validEmail()) {
+                val code = uiState.recoveryInput.filterNot { it.isWhitespace() || it == '-' }
+                if (code.length == 64 && code.all { it.uppercaseChar() in "0123456789ABCDEF" }) moveTo(AuthStage.RESET_PASSWORD)
+                else uiState = uiState.copy(error = "Escribe la clave de recuperación completa.")
+            }
+            AuthStage.RESET_PASSWORD -> recover()
             AuthStage.LOGIN -> {
                 val email = uiState.email
                 val password = uiState.password.toCharArray()
@@ -105,7 +158,7 @@ class AuthViewModel @JvmOverloads constructor(
     }
 
     private fun register() {
-        if (!matchingPassword()) return
+        if (!validPassword()) return
         if (uiState.importLegacy && uiState.oldPassword.isBlank()) {
             uiState = uiState.copy(error = "Escribe la contraseña de la bóveda anterior para conservarla.")
             return
@@ -141,7 +194,7 @@ class AuthViewModel @JvmOverloads constructor(
     }
 
     private fun recover() {
-        if (!matchingPassword()) return
+        if (!validPassword()) return
         val email = uiState.email
         val recovery = uiState.recoveryInput
         val password = uiState.password.toCharArray()

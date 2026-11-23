@@ -21,9 +21,10 @@ class LaunchSmokeTest {
     @Test
     fun launchReachesLogin() {
         compose.waitUntil(timeoutMillis = 15_000) {
-            compose.onAllNodesWithText("Correo electrónico").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Correo electrónico").fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithText("Conocer TheVault").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Correo electrónico").assertIsDisplayed()
+        compose.onNodeWithText("TheVault").assertIsDisplayed()
     }
 
 }

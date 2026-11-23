@@ -11,6 +11,14 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
@@ -41,6 +49,32 @@ class VistasDisenoTest {
 
     @Test fun registroLocal() = guardar("registro-local", false) {
         LoginScreen(AuthUiState(showSplash = false, stage = AuthStage.REGISTER), {}, {}, {}, {})
+    }
+
+    @Test fun presentacion() = acceso("presentacion", AuthStage.WELCOME)
+    @Test fun privacidad() = acceso("privacidad", AuthStage.PRIVACY)
+    @Test fun explicaRecuperacion() = acceso("explica-recuperacion", AuthStage.KEY_EXPLANATION)
+    @Test fun contrasena() = acceso("contrasena", AuthStage.REGISTER_PASSWORD)
+    @Test fun confirmaClave() = acceso("confirma-clave", AuthStage.CONFIRM_KEY)
+    @Test fun recuperarAcceso() = acceso("recuperar-acceso", AuthStage.RECOVER)
+
+    private fun acceso(nombre: String, paso: AuthStage) = guardar(nombre, false) {
+        LoginScreen(AuthUiState(showSplash = false, stage = paso), {}, {}, {}, {})
+    }
+
+    @Test fun confirmarEnPantallaPequenaConTextoGrande() {
+        vista.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1.3f)) {
+                TheVaultTheme {
+                    Box(Modifier.size(320.dp, 480.dp)) {
+                        LoginScreen(AuthUiState(showSplash = false, stage = AuthStage.CONFIRM_KEY), {}, {}, {}, {})
+                    }
+                }
+            }
+        }
+        vista.onNodeWithText("Guardar cuenta y entrar").assertIsDisplayed()
+        vista.onNodeWithText("Últimos 8 caracteres").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun claveRecuperacion() = guardar("clave-recuperacion", false) {
