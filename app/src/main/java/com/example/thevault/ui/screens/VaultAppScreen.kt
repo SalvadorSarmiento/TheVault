@@ -2,10 +2,11 @@ package com.example.thevault.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.BusinessCenter
@@ -82,6 +83,9 @@ fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
                         )
                     }
                 }
+            } else if (state.destination == VaultDestination.EDITOR) {
+                CredentialSaveBar(draft = state.draft, onSave = viewModel::saveDraft, isSaving = state.isSaving,
+                    modifier = Modifier.navigationBarsPadding().imePadding())
             }
         },
         floatingActionButton = {
@@ -100,8 +104,8 @@ fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
         Box(
             modifier = Modifier.fillMaxSize()
                 .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
-                .padding(if (isTopLevel) padding else PaddingValues(bottom = padding.calculateBottomPadding()))
-                .statusBarsPadding()
+                .padding(padding)
+                .consumeWindowInsets(padding)
         ) {
             when (state.destination) {
                 VaultDestination.VAULT -> VaultListScreen(
@@ -137,7 +141,8 @@ fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
                     onBack = viewModel::onBack,
                     onDraftChange = viewModel::updateDraft,
                     onSave = viewModel::saveDraft,
-                    isSaving = state.isSaving
+                    isSaving = state.isSaving,
+                    showSaveBar = false
                 )
             }
         }

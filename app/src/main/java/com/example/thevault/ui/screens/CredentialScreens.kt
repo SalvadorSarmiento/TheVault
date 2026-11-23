@@ -1,18 +1,7 @@
 package com.example.thevault.ui.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -23,53 +12,30 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
-import com.example.thevault.ui.components.CategoryIcon
-import com.example.thevault.ui.components.PasswordStrength
-import com.example.thevault.ui.components.ScreenHeader
-import com.example.thevault.ui.components.VaultPrimaryButton
+import com.example.thevault.ui.components.*
 import com.example.thevault.ui.vault.CredentialDraft
 
 @Composable
 fun CredentialDetailScreen(
-    credential: Credential?,
-    showDeleteDialog: Boolean,
-    onBack: () -> Unit,
-    onEdit: () -> Unit,
-    onToggleFavorite: () -> Unit,
-    onRequestDelete: () -> Unit,
-    onDismissDelete: () -> Unit,
-    onConfirmDelete: () -> Unit,
-    onMessage: (String) -> Unit
+    credential: Credential?, showDeleteDialog: Boolean, onBack: () -> Unit, onEdit: () -> Unit,
+    onToggleFavorite: () -> Unit, onRequestDelete: () -> Unit, onDismissDelete: () -> Unit,
+    onConfirmDelete: () -> Unit, onMessage: (String) -> Unit
 ) {
     if (credential == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -77,264 +43,177 @@ fun CredentialDetailScreen(
         }
         return
     }
-
     val clipboard = LocalClipboardManager.current
     var showPassword by rememberSaveable(credential.id) { mutableStateOf(false) }
+    fun copy(value: String, message: String) { clipboard.setText(AnnotatedString(value)); onMessage(message) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().navigationBarsPadding(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), contentPadding = PaddingValues(24.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        item { ScreenHeader("Detalle de la cuenta", onBack = onBack) }
         item {
-            ScreenHeader(
-                title = "Credencial",
-                onBack = onBack,
-                action = {
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Outlined.Edit, contentDescription = "Editar credencial")
+            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
+                Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    CategoryIcon(credential.category)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(credential.name, style = MaterialTheme.typography.titleLarge)
+                        Text(credential.category.label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(if (credential.isFavorite) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = if (credential.isFavorite) "Quitar de favoritos" else "Agregar a favoritos")
                     }
                 }
-            )
+            }
         }
+        item { SectionHeading("Datos de acceso", "Consulta o copia cada dato por separado.") }
         item {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                CategoryIcon(credential.category)
-                Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
-                    Text(credential.name, style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        credential.category.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        if (credential.isFavorite) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = if (credential.isFavorite) "Quitar de favoritos" else "Agregar a favoritos",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+            DetailCard("Usuario o correo", credential.username) {
+                DetailAction("Copiar usuario", Icons.Outlined.ContentCopy) { copy(credential.username, "Usuario copiado") }
             }
         }
         item {
-            DetailCard(
-                label = "Usuario o correo",
-                value = credential.username,
-                actionIcon = Icons.Outlined.ContentCopy,
-                actionDescription = "Copiar usuario",
-                onAction = {
-                    clipboard.setText(AnnotatedString(credential.username))
-                    onMessage("Usuario copiado")
+            DetailCard("Contraseña", if (showPassword) credential.password else "•".repeat(12)) {
+                DetailAction(if (showPassword) "Ocultar" else "Mostrar",
+                    if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                    if (showPassword) "Ocultar contraseña" else "Mostrar contraseña") { showPassword = !showPassword }
+                DetailAction("Copiar", Icons.Outlined.ContentCopy, "Copiar contraseña") { copy(credential.password, "Contraseña copiada") }
+            }
+        }
+        if (credential.website.isNotBlank() || credential.notes.isNotBlank()) {
+            item { SectionHeading("Información adicional") }
+        }
+        if (credential.website.isNotBlank()) item {
+            DetailCard("Sitio web", credential.website) {
+                DetailAction("Copiar enlace", Icons.Outlined.ContentCopy) { copy(credential.website, "Enlace copiado") }
+            }
+        }
+        if (credential.notes.isNotBlank()) item { DetailCard("Notas", credential.notes) }
+        item {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                VaultPrimaryButton("Editar credencial", onClick = onEdit)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                TextButton(onClick = onRequestDelete, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                    Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    Text("Eliminar credencial", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 12.dp))
                 }
-            )
-        }
-        item {
-            DetailCard(
-                label = "Contraseña",
-                value = if (showPassword) credential.password else "•".repeat(12),
-                actionIcon = if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                actionDescription = if (showPassword) "Ocultar contraseña" else "Mostrar contraseña",
-                secondaryAction = {
-                    IconButton(onClick = {
-                        clipboard.setText(AnnotatedString(credential.password))
-                        onMessage("Contraseña copiada")
-                    }) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copiar contraseña")
-                    }
-                },
-                onAction = { showPassword = !showPassword }
-            )
-        }
-        if (credential.website.isNotBlank()) {
-            item {
-                DetailCard(
-                    label = "Sitio web",
-                    value = credential.website,
-                    actionIcon = Icons.Outlined.Language,
-                    actionDescription = "Abrir sitio web",
-                    onAction = { onMessage("Enlace de demostración") }
-                )
-            }
-        }
-        if (credential.notes.isNotBlank()) {
-            item { DetailCard(label = "Notas", value = credential.notes) }
-        }
-        item {
-            OutlinedButton(
-                onClick = onEdit,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Outlined.Edit, contentDescription = null)
-                Text("Editar credencial", modifier = Modifier.padding(start = 8.dp))
-            }
-        }
-        item {
-            TextButton(onClick = onRequestDelete, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                Text("Eliminar credencial", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 8.dp))
             }
         }
     }
-
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = onDismissDelete,
-            title = { Text("¿Eliminar credencial?") },
-            text = { Text("${credential.name} se eliminará de esta demostración. Esta acción no se puede deshacer.") },
-            confirmButton = {
-                TextButton(onClick = onConfirmDelete) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = onDismissDelete) { Text("Cancelar") } }
-        )
-    }
+    if (showDeleteDialog) AlertDialog(onDismissRequest = onDismissDelete,
+        title = { Text("¿Eliminar credencial?") },
+        text = { Text("${credential.name} se eliminará de la bóveda. Esta acción no se puede deshacer.") },
+        confirmButton = { TextButton(onClick = onConfirmDelete) { Text("Eliminar", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onClick = onDismissDelete) { Text("Cancelar") } })
 }
 
 @Composable
-private fun DetailCard(
-    label: String,
-    value: String,
-    actionIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    actionDescription: String = "",
-    secondaryAction: (@Composable () -> Unit)? = null,
-    onAction: () -> Unit = {}
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-    ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(6.dp))
-                Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+private fun DetailCard(label: String, value: String, actions: (@Composable () -> Unit)? = null) {
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            actions?.let {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) { it() }
             }
-            if (actionIcon != null) {
-                IconButton(onClick = onAction) { Icon(actionIcon, contentDescription = actionDescription) }
-            }
-            secondaryAction?.invoke()
         }
     }
 }
 
 @Composable
-fun CredentialEditorScreen(
-    draft: CredentialDraft,
-    onBack: () -> Unit,
-    onDraftChange: ((CredentialDraft) -> CredentialDraft) -> Unit,
-    onSave: () -> Unit,
-    isSaving: Boolean = false
-) {
+private fun DetailAction(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String? = null, onClick: () -> Unit) {
+    TextButton(onClick = onClick) {
+        Icon(icon, contentDescription = description, modifier = Modifier.size(20.dp))
+        Text(text, modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+@Composable
+fun CredentialEditorScreen(draft: CredentialDraft, onBack: () -> Unit,
+    onDraftChange: ((CredentialDraft) -> CredentialDraft) -> Unit, onSave: () -> Unit,
+    isSaving: Boolean = false, showSaveBar: Boolean = true) {
     var categoryMenuOpen by remember { mutableStateOf(false) }
     val isEditing = draft.id != null
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().navigationBarsPadding().imePadding(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item {
-            ScreenHeader(
-                title = if (isEditing) "Editar credencial" else "Nueva credencial",
-                subtitle = "Datos de acceso del servicio",
-                onBack = onBack
-            )
-        }
-        item {
-            OutlinedTextField(
-                value = draft.name,
-                onValueChange = { value -> onDraftChange { it.copy(name = value) } },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Nombre") },
-                placeholder = { Text("Nombre del servicio") },
-                singleLine = true,
-                isError = draft.submitted && draft.name.isBlank(),
-                supportingText = if (draft.submitted && draft.name.isBlank()) {{ Text("El nombre es obligatorio.") }} else null
-            )
-        }
-        item {
-            OutlinedTextField(
-                value = draft.username,
-                onValueChange = { value -> onDraftChange { it.copy(username = value) } },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Usuario o correo") },
-                singleLine = true,
-                isError = draft.submitted && draft.username.isBlank(),
-                supportingText = if (draft.submitted && draft.username.isBlank()) {{ Text("Ingresa un usuario o correo.") }} else null
-            )
-        }
-        item {
-            OutlinedTextField(
-                value = draft.password,
-                onValueChange = { value -> onDraftChange { it.copy(password = value) } },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Contraseña") },
-                visualTransformation = if (draft.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { onDraftChange { it.copy(showPassword = !it.showPassword) } }) {
-                        Icon(
-                            if (draft.showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                            contentDescription = if (draft.showPassword) "Ocultar contraseña" else "Mostrar contraseña"
-                        )
-                    }
-                },
-                singleLine = true,
-                isError = draft.submitted && draft.password.isBlank(),
-                supportingText = if (draft.submitted && draft.password.isBlank()) {{ Text("Ingresa una contraseña.") }} else null,
-                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false)
-            )
-        }
-        if (draft.password.isNotBlank()) item { PasswordStrength(draft.password) }
-        item {
-            OutlinedTextField(
-                value = draft.website,
-                onValueChange = { value -> onDraftChange { it.copy(website = value) } },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Sitio web (opcional)") },
-                singleLine = true
-            )
-        }
-        item {
-            Box {
-                OutlinedButton(
-                    onClick = { categoryMenuOpen = true },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Categoría: ${draft.category.label}", modifier = Modifier.weight(1f))
-                    Icon(Icons.Outlined.ExpandMore, contentDescription = "Cambiar categoría")
+    Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(24.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp)) {
+            item { ScreenHeader(if (isEditing) "Editar credencial" else "Nueva credencial",
+                "Completa un bloque a la vez.", onBack = onBack) }
+            item {
+                VaultSection("La cuenta", "Un nombre para reconocerla fácilmente.") {
+                    OutlinedTextField(value = draft.name,
+                        onValueChange = { value -> onDraftChange { it.copy(name = value) } },
+                        modifier = Modifier.fillMaxWidth(), label = { Text("Nombre") },
+                        placeholder = { Text("Nombre del servicio") }, singleLine = true, enabled = !isSaving,
+                        shape = RoundedCornerShape(16.dp), isError = draft.submitted && draft.name.isBlank(),
+                        supportingText = if (draft.submitted && draft.name.isBlank()) {{ Text("El nombre es obligatorio.") }} else null)
                 }
-                DropdownMenu(expanded = categoryMenuOpen, onDismissRequest = { categoryMenuOpen = false }) {
-                    CredentialCategory.entries.forEach { category ->
-                        DropdownMenuItem(
-                            text = { Text(category.label) },
-                            onClick = {
-                                onDraftChange { it.copy(category = category) }
-                                categoryMenuOpen = false
+            }
+            item {
+                VaultSection("Datos de acceso", "El usuario y la contraseña de este servicio.") {
+                    OutlinedTextField(value = draft.username,
+                        onValueChange = { value -> onDraftChange { it.copy(username = value) } },
+                        modifier = Modifier.fillMaxWidth(), label = { Text("Usuario o correo") }, singleLine = true,
+                        enabled = !isSaving, shape = RoundedCornerShape(16.dp),
+                        isError = draft.submitted && draft.username.isBlank(),
+                        supportingText = if (draft.submitted && draft.username.isBlank()) {{ Text("Ingresa un usuario o correo.") }} else null)
+                    OutlinedTextField(value = draft.password,
+                        onValueChange = { value -> onDraftChange { it.copy(password = value) } },
+                        modifier = Modifier.fillMaxWidth(), label = { Text("Contraseña") }, singleLine = true,
+                        enabled = !isSaving, shape = RoundedCornerShape(16.dp),
+                        visualTransformation = if (draft.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = { IconButton(onClick = { onDraftChange { it.copy(showPassword = !it.showPassword) } }, enabled = !isSaving) {
+                            Icon(if (draft.showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = if (draft.showPassword) "Ocultar contraseña" else "Mostrar contraseña")
+                        } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
+                        isError = draft.submitted && draft.password.isBlank(),
+                        supportingText = if (draft.submitted && draft.password.isBlank()) {{ Text("Ingresa una contraseña.") }} else null)
+                    if (draft.password.isNotBlank()) PasswordStrength(draft.password)
+                }
+            }
+            item {
+                VaultSection("Organización y notas", "La categoría ayuda a encontrar esta cuenta después.") {
+                    Box {
+                        OutlinedButton(onClick = { categoryMenuOpen = true }, enabled = !isSaving,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) {
+                            Text("Categoría: ${draft.category.label}", modifier = Modifier.weight(1f))
+                            Icon(Icons.Outlined.ExpandMore, contentDescription = "Cambiar categoría")
+                        }
+                        DropdownMenu(expanded = categoryMenuOpen, onDismissRequest = { categoryMenuOpen = false }) {
+                            CredentialCategory.entries.forEach { category ->
+                                DropdownMenuItem(text = { Text(category.label) }, onClick = {
+                                    onDraftChange { it.copy(category = category) }; categoryMenuOpen = false
+                                })
                             }
-                        )
+                        }
                     }
+                    OutlinedTextField(value = draft.website,
+                        onValueChange = { value -> onDraftChange { it.copy(website = value) } },
+                        modifier = Modifier.fillMaxWidth(), label = { Text("Sitio web (opcional)") },
+                        singleLine = true, enabled = !isSaving, shape = RoundedCornerShape(16.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
+                    OutlinedTextField(value = draft.notes,
+                        onValueChange = { value -> onDraftChange { it.copy(notes = value) } },
+                        modifier = Modifier.fillMaxWidth(), minLines = 4, label = { Text("Notas (opcional)") },
+                        enabled = !isSaving, shape = RoundedCornerShape(16.dp))
                 }
             }
         }
-        item {
-            OutlinedTextField(
-                value = draft.notes,
-                onValueChange = { value -> onDraftChange { it.copy(notes = value) } },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                label = { Text("Notas (opcional)") }
-            )
-        }
-        item {
-            Spacer(Modifier.height(8.dp))
-            VaultPrimaryButton(
-                text = if (isEditing) "Guardar cambios" else "Guardar credencial",
-                onClick = onSave,
-                loading = isSaving
-            )
+        if (showSaveBar) CredentialSaveBar(draft, onSave, isSaving)
+    }
+}
+
+@Composable
+internal fun CredentialSaveBar(draft: CredentialDraft, onSave: () -> Unit, isSaving: Boolean,
+    modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, color = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
+            VaultPrimaryButton(if (draft.id != null) "Guardar cambios" else "Guardar credencial",
+                onClick = onSave, loading = isSaving)
         }
     }
 }

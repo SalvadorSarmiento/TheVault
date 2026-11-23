@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +43,8 @@ import com.example.thevault.ui.theme.VaultHeroText
 import com.example.thevault.ui.theme.VaultHeroMuted
 import com.example.thevault.ui.theme.VaultHeroAccent
 import com.example.thevault.ui.components.VaultHero
+import com.example.thevault.ui.components.VaultSection
+import com.example.thevault.ui.components.SectionHeading
 import androidx.compose.ui.unit.dp
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
@@ -57,71 +62,51 @@ fun PasswordGeneratorScreen(state: VaultUiState, viewModel: VaultViewModel) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         item { ScreenHeader("Generador", "Personaliza una contraseña nueva.") }
         item {
             VaultHero {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("UNA LLAVE NUEVA", style = MaterialTheme.typography.labelSmall, color = VaultHeroMuted)
-                        Spacer(Modifier.height(10.dp))
-                        Text(state.generatedPassword, style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace, color = VaultHeroText)
-                    }
-                    IconButton(onClick = {
+                Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Text("TU NUEVA CONTRASEÑA", style = MaterialTheme.typography.labelMedium, color = VaultHeroMuted)
+                    Text(state.generatedPassword, style = MaterialTheme.typography.headlineSmall,
+                        fontFamily = FontFamily.Monospace, color = VaultHeroText)
+                    androidx.compose.material3.TextButton(onClick = {
                         clipboard.setText(AnnotatedString(state.generatedPassword))
                         viewModel.showMessage("Contraseña copiada")
                     }) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = "Copiar contraseña", tint = VaultHeroAccent)
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = null, tint = VaultHeroAccent)
+                        Text("Copiar contraseña", color = VaultHeroText, modifier = Modifier.padding(start = 12.dp))
                     }
                 }
             }
         }
+
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Longitud", style = MaterialTheme.typography.titleMedium)
-                Text("${state.generatorLength}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            }
-            Slider(
-                value = state.generatorLength.toFloat(),
-                onValueChange = { viewModel.setGeneratorLength(it.toInt()) },
-                valueRange = 8f..32f,
-                steps = 23
-            )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("8", style = MaterialTheme.typography.bodyMedium)
-                Text("32", style = MaterialTheme.typography.bodyMedium)
+            VaultSection("Longitud", "Elige entre 8 y 32 caracteres.") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Caracteres", style = MaterialTheme.typography.bodyLarge)
+                    Text("${state.generatorLength}", fontWeight = FontWeight.Bold)
+                }
+                Slider(value = state.generatorLength.toFloat(),
+                    onValueChange = { viewModel.setGeneratorLength(it.toInt()) }, valueRange = 8f..32f, steps = 23)
             }
         }
         item {
-            GeneratorSwitch("Mayúsculas (A–Z)", state.includeUppercase) {
-                viewModel.setGeneratorOptions(uppercase = it)
-            }
-            GeneratorSwitch("Minúsculas (a–z)", state.includeLowercase) {
-                viewModel.setGeneratorOptions(lowercase = it)
-            }
-            GeneratorSwitch("Números (0–9)", state.includeNumbers) {
-                viewModel.setGeneratorOptions(numbers = it)
-            }
-            GeneratorSwitch("Símbolos (!@#$)", state.includeSymbols) {
-                viewModel.setGeneratorOptions(symbols = it)
+            VaultSection("Qué incluir", "Mantén activa al menos una opción.") {
+                GeneratorSwitch("Mayúsculas (A–Z)", state.includeUppercase) { viewModel.setGeneratorOptions(uppercase = it) }
+                GeneratorSwitch("Minúsculas (a–z)", state.includeLowercase) { viewModel.setGeneratorOptions(lowercase = it) }
+                GeneratorSwitch("Números (0–9)", state.includeNumbers) { viewModel.setGeneratorOptions(numbers = it) }
+                GeneratorSwitch("Símbolos (!@#$)", state.includeSymbols) { viewModel.setGeneratorOptions(symbols = it) }
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = viewModel::regeneratePassword,
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) { Text("Generar otra") }
-                VaultPrimaryButton(
-                    text = "Usar contraseña",
-                    onClick = viewModel::useGeneratedPassword,
-                    modifier = Modifier.weight(1f)
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                VaultPrimaryButton("Usar contraseña", onClick = viewModel::useGeneratedPassword)
+                OutlinedButton(onClick = viewModel::regeneratePassword,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(16.dp)) {
+                    Text("Generar otra")
+                }
             }
         }
     }
@@ -130,11 +115,13 @@ fun PasswordGeneratorScreen(state: VaultUiState, viewModel: VaultViewModel) {
 @Composable
 private fun GeneratorSwitch(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(56.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -143,26 +130,26 @@ fun CategoriesScreen(credentials: List<Credential>, onCategoryClick: (Credential
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 24.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item { ScreenHeader("Categorías", "Organiza tus cuentas por tipo de uso.") }
-        item { Spacer(Modifier.height(10.dp)) }
+        item { SectionHeading("Elige una categoría") }
         CredentialCategory.entries.forEach { category ->
             val count = credentials.count { it.category == category }
             item(category.name) {
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable { onCategoryClick(category) },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(20.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        horizontalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
                         CategoryIcon(category)
-                        Column(Modifier.weight(1f)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(category.label, style = MaterialTheme.typography.titleMedium)
                             Text(
                                 "$count ${if (count == 1) "credencial" else "credenciales"}",
@@ -190,28 +177,28 @@ fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onL
     LazyColumn(
         modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = 24.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 24.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item { ScreenHeader("Ajustes") }
         item {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                VaultLogo(Modifier.padding(6.dp).height(58.dp))
-                Column(Modifier.padding(start = 14.dp)) {
-                    Text("TheVault", style = MaterialTheme.typography.titleLarge)
-                    Text("Tu espacio personal", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            VaultSection("Tu espacio personal") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    VaultLogo(Modifier.height(56.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("TheVault", style = MaterialTheme.typography.titleLarge)
+                        Text("Tus cuentas, en este dispositivo.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
-        item { Text("Apariencia", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
+        item { SectionHeading("Apariencia") }
         item {
-            SettingsRow(
-                icon = Icons.Outlined.DarkMode,
-                title = "Tema oscuro",
+            SettingsRow(icon = Icons.Outlined.DarkMode, title = "Tema oscuro",
                 subtitle = if (darkTheme) "Activado" else "Desactivado",
-                trailing = { Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange) }
-            )
+                trailing = { Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange) })
         }
-        item { Text("Seguridad", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp)) }
+        item { SectionHeading("Seguridad y almacenamiento") }
         item {
             InfoCard(
                 icon = Icons.Outlined.Lock,
@@ -229,7 +216,7 @@ fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onL
         item {
             OutlinedButton(
                 onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Outlined.Logout, contentDescription = null)
@@ -248,17 +235,17 @@ private fun SettingsRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

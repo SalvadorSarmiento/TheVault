@@ -14,6 +14,15 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performClick
+import androidx.lifecycle.viewModelScope
+import androidx.test.core.app.ApplicationProvider
+import android.app.Application
+import kotlinx.coroutines.cancel
+import org.junit.Assert.*
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
@@ -27,6 +36,14 @@ import com.example.thevault.ui.auth.AuthStage
 import com.example.thevault.ui.screens.LoginScreen
 import com.example.thevault.ui.screens.SplashScreen
 import com.example.thevault.ui.screens.VaultListScreen
+import com.example.thevault.ui.screens.CredentialDetailScreen
+import com.example.thevault.ui.screens.CredentialEditorScreen
+import com.example.thevault.ui.screens.CategoriesScreen
+import com.example.thevault.ui.screens.PasswordGeneratorScreen
+import com.example.thevault.ui.screens.SettingsScreen
+import com.example.thevault.ui.vault.CredentialDraft
+import com.example.thevault.ui.vault.VaultViewModel
+import com.example.thevault.ui.vault.VaultDestination
 import com.example.thevault.ui.theme.TheVaultTheme
 import com.example.thevault.ui.vault.VaultUiState
 import java.io.File
@@ -85,6 +102,82 @@ class VistasDisenoTest {
 
     @Test fun bovedaClara() = boveda("boveda-clara", false)
     @Test fun bovedaOscura() = boveda("boveda-oscura", true)
+
+    @Test fun detalle() = guardar("detalle-cuenta", false) {
+        CredentialDetailScreen(cuentaDeMuestra(), false, {}, {}, {}, {}, {}, {}, {})
+    }
+
+    @Test fun detalleOscuro() = guardar("detalle-oscuro", true) {
+        CredentialDetailScreen(cuentaDeMuestra(), false, {}, {}, {}, {}, {}, {}, {})
+    }
+
+    @Test fun editor() = guardar("editor-cuenta", false) {
+        CredentialEditorScreen(CredentialDraft(name = "Mi cuenta personal", username = "persona@ejemplo.com"), {}, {}, {})
+    }
+
+    @Test fun categorias() = guardar("categorias-cuentas", false) {
+        CategoriesScreen(listOf(cuentaDeMuestra()), {})
+    }
+
+    @Test fun ajustes() = guardar("ajustes-cuentas", false) { SettingsScreen(false, {}, {}) }
+
+    @Test fun generador() {
+        val vm = nuevoGenerador()
+        try {
+            guardar("generador-cuentas", false) {
+                PasswordGeneratorScreen(VaultUiState(generatedPassword = "Ab3!Cd4@Ef5#Gh6!Ij7@Kl8#Mn9!Op0@", generatorLength = 32), vm)
+            }
+        } finally { vista.runOnUiThread { vm.viewModelScope.cancel() } }
+    }
+
+    @Test fun editorPequenoConTextoGrande() {
+        vista.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1.3f)) {
+                TheVaultTheme {
+                    Box(Modifier.size(320.dp, 480.dp)) {
+                        CredentialEditorScreen(CredentialDraft(), {}, {}, {})
+                    }
+                }
+            }
+        }
+        vista.onNodeWithText("Guardar credencial").assertIsDisplayed()
+        vista.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Notas (opcional)"))
+        vista.onNodeWithText("Notas (opcional)").assertIsDisplayed()
+        vista.onNodeWithText("Guardar credencial").assertIsDisplayed()
+    }
+
+    @Test fun opcionesDelGeneradorSiguenFuncionando() {
+        val vm = nuevoGenerador()
+        try {
+            vista.setContent { TheVaultTheme { PasswordGeneratorScreen(vm.uiState, vm) } }
+            listOf("Mayúsculas (A–Z)", "Minúsculas (a–z)", "Números (0–9)", "Símbolos (!@#$)").forEach { label ->
+                vista.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(label))
+                vista.onNodeWithText(label).performClick()
+            }
+            vista.runOnIdle {
+                assertFalse(vm.uiState.includeUppercase)
+                assertFalse(vm.uiState.includeLowercase)
+                assertFalse(vm.uiState.includeNumbers)
+                assertTrue(vm.uiState.includeSymbols)
+            }
+            vista.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Usar contraseña"))
+            vista.onNodeWithText("Usar contraseña").performClick()
+            vista.runOnIdle {
+                assertEquals(VaultDestination.EDITOR, vm.uiState.destination)
+                assertEquals(vm.uiState.generatedPassword, vm.uiState.draft.password)
+            }
+        } finally { vista.runOnUiThread { vm.viewModelScope.cancel() } }
+    }
+
+    private fun nuevoGenerador(): VaultViewModel {
+        lateinit var vm: VaultViewModel
+        vista.runOnUiThread { vm = VaultViewModel(ApplicationProvider.getApplicationContext<Application>()) }
+        return vm
+    }
+
+    private fun cuentaDeMuestra() = Credential(id = 1, name = "Mi cuenta personal", username = "persona@ejemplo.com",
+        password = "solo-una-muestra", website = "https://ejemplo.com", notes = "Datos ficticios para revisar el diseño.")
 
     private fun boveda(nombre: String, oscuro: Boolean) {
         val cuentas = listOf(

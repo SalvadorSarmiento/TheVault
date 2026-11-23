@@ -93,12 +93,19 @@ class RegistroLocalUiTest {
             compose.waitForIdle()
             assertTrue(auth.uiState.isAuthenticated)
             compose.onNodeWithText("Mi bóveda").assertIsDisplayed()
-            compose.runOnUiThread {
-                vault.startCreate()
-                vault.updateDraft { it.copy(name = "Cuenta UI", username = "persona", password = "conservar") }
-                vault.saveDraft()
-            }
+            compose.onNodeWithContentDescription("Añadir credencial").performClick()
+            compose.onNodeWithText("Guardar credencial").assertIsDisplayed()
+            compose.onNodeWithText("Nombre").performTextInput("Cuenta UI")
+            compose.onNodeWithText("Usuario o correo").performScrollTo().performTextInput("persona")
+            compose.onNodeWithText("Contraseña").performScrollTo().performTextInput("conservar")
+            pulse("Guardar credencial")
             waitFor { vault.uiState.credentials.size == 1 && !vault.uiState.isSaving }
+            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Editar credencial"))
+            compose.onNodeWithText("Editar credencial").performClick()
+            compose.onNodeWithText("Nombre").performTextReplacement("Cuenta UI editada")
+            pulse("Guardar cambios")
+            waitFor { !vault.uiState.isSaving && vault.uiState.credentials.single().name == "Cuenta UI editada" }
+            assertEquals(1, vault.uiState.credentials.size)
             compose.runOnUiThread { vault.clearSession(); auth.logout() }
             assertEquals(AuthStage.LOGIN, auth.uiState.stage)
             compose.onNodeWithText("Contraseña maestra").performTextInput("Mi frase privada 2026")
@@ -115,7 +122,16 @@ class RegistroLocalUiTest {
             pulse("Cambiar contraseña y entrar")
             waitFor { vault.uiState.isUnlocked }
             assertEquals("conservar", vault.uiState.credentials.single().password)
-            compose.runOnUiThread { vault.openCredential(vault.uiState.credentials.single().id); vault.deleteSelected() }
+            compose.runOnUiThread { vault.openCredential(vault.uiState.credentials.single().id) }
+            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasContentDescription("Mostrar contraseña"))
+            compose.onNodeWithContentDescription("Mostrar contraseña").performClick()
+            compose.onNodeWithText("conservar").assertIsDisplayed()
+            compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Eliminar credencial"))
+            compose.onNodeWithText("Eliminar credencial").performClick()
+            compose.onNodeWithText("Cancelar").performClick()
+            assertEquals(1, vault.uiState.credentials.size)
+            compose.onNodeWithText("Eliminar credencial").performClick()
+            compose.onNodeWithText("Eliminar", substring = false).performClick()
             waitFor { vault.uiState.credentials.isEmpty() }
             lateinit var returning: AuthViewModel
             compose.runOnUiThread { returning = AuthViewModel(app, LocalAccessService(app, accounts, database)) }

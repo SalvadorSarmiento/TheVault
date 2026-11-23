@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,8 +54,8 @@ fun VaultListScreen(
 ) {
     LazyColumn(
         modifier = Modifier.padding(horizontal = 24.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 24.dp, bottom = 104.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 28.dp, bottom = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item {
             VaultHero {
@@ -82,12 +83,12 @@ fun VaultListScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                    Column {
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("${state.credentials.size}", style = MaterialTheme.typography.headlineMedium, color = VaultHeroText)
                         Text("Cuentas guardadas", style = MaterialTheme.typography.labelMedium, color = VaultHeroMuted)
                     }
-                    Column {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("${state.credentials.count { it.isFavorite }}", style = MaterialTheme.typography.headlineMedium, color = VaultHeroAccent)
                         Text("Favoritas", style = MaterialTheme.typography.labelMedium, color = VaultHeroMuted)
                     }
@@ -106,8 +107,8 @@ fun VaultListScreen(
             )
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                VaultFilter.entries.forEach { filter ->
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(VaultFilter.entries) { filter ->
                     FilterChip(
                         selected = state.categoryFilter == null && state.filter == filter,
                         onClick = { onFilterChange(filter) },
@@ -125,7 +126,7 @@ fun VaultListScreen(
                 if (state.query.isBlank()) "Tus cuentas" else "Resultados",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
             )
         }
         if (credentials.isEmpty()) {
@@ -149,9 +150,9 @@ private fun CredentialRow(credential: Credential, onClick: () -> Unit) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             CategoryIcon(credential.category)
             Column(modifier = Modifier.weight(1f)) {
@@ -161,7 +162,7 @@ private fun CredentialRow(credential: Credential, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     credential.username,
                     style = MaterialTheme.typography.bodyMedium,
