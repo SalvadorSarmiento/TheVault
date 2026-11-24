@@ -3,6 +3,7 @@
 - Paleta grafito y turquesa en toda la app: fondos neutros, tarjetas diferenciadas y acciones turquesa.
 - El modo grafito es el inicial. En Ajustes puedes cambiar a una versión clara de la misma paleta.
 - Icono, logo, pantalla de inicio y barras del sistema adaptados a los nuevos colores.
+- Icono D2: una V de esquinas suaves con cerradura, compartida por el lanzador y el logo de la app.
 - Inicio con una bienvenida más clara.
 - Bóveda con resumen de cuentas y favoritas.
 - Tarjetas, categorías y botón para añadir cuentas más fáciles de reconocer.
