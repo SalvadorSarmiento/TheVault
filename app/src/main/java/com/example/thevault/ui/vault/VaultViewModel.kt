@@ -47,7 +47,7 @@ data class VaultUiState(
     val selectedCredentialId: Long? = null,
     val draft: CredentialDraft = CredentialDraft(),
     val showDeleteDialog: Boolean = false,
-    val darkTheme: Boolean = false,
+    val darkTheme: Boolean = true,
     val generatedPassword: String = "",
     val generatorLength: Int = 16,
     val includeUppercase: Boolean = true,

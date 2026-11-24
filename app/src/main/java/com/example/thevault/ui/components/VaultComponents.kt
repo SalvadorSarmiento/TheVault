@@ -32,11 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.ColumnScope
-import com.example.thevault.ui.theme.VaultHeroStart
-import com.example.thevault.ui.theme.VaultHeroEnd
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -142,14 +138,8 @@ fun CategoryIcon(category: CredentialCategory, modifier: Modifier = Modifier) {
 
 @Composable
 fun VaultHero(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Box(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(listOf(VaultHeroStart, VaultHeroEnd)))
-    ) {
-        Box(
-            Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp)
-                .size(112.dp).clip(RoundedCornerShape(56.dp)).background(Color.White.copy(alpha = 0.05f))
-        )
+    Surface(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Column(Modifier.fillMaxWidth().padding(24.dp), content = content)
     }
 }

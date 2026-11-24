@@ -34,9 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.thevault.ui.theme.VaultHeroText
-import com.example.thevault.ui.theme.VaultHeroMuted
-import com.example.thevault.ui.theme.VaultHeroAccent
 import com.example.thevault.ui.components.VaultHero
 import com.example.thevault.data.model.Credential
 import com.example.thevault.ui.components.CategoryIcon
@@ -61,36 +58,36 @@ fun VaultListScreen(
             VaultHero {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("TU ESPACIO PERSONAL", style = MaterialTheme.typography.labelSmall, color = VaultHeroMuted)
+                        Text("TU ESPACIO PERSONAL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = state.categoryFilter?.label ?: "Mi bóveda",
                             style = MaterialTheme.typography.headlineLarge,
-                            color = VaultHeroText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
                             "Todo a mano. Solo para ti.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = VaultHeroMuted
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Box(
-                        Modifier.size(48.dp).background(VaultHeroText.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
+                        Modifier.size(48.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Outlined.Lock, contentDescription = null, tint = VaultHeroAccent)
+                        Icon(Icons.Outlined.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("${state.credentials.size}", style = MaterialTheme.typography.headlineMedium, color = VaultHeroText)
-                        Text("Cuentas guardadas", style = MaterialTheme.typography.labelMedium, color = VaultHeroMuted)
+                        Text("${state.credentials.size}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Cuentas guardadas", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("${state.credentials.count { it.isFavorite }}", style = MaterialTheme.typography.headlineMedium, color = VaultHeroAccent)
-                        Text("Favoritas", style = MaterialTheme.typography.labelMedium, color = VaultHeroMuted)
+                        Text("${state.credentials.count { it.isFavorite }}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("Favoritas", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

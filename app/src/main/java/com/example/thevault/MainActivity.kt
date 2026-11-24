@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.thevault.ui.auth.AuthViewModel
 import com.example.thevault.ui.screens.LoginScreen
@@ -35,6 +36,13 @@ internal fun TheVaultApp(
 ) {
     val authState = authViewModel.uiState
     val vaultState = vaultViewModel.uiState
+    val activity = LocalContext.current as? ComponentActivity
+
+    LaunchedEffect(activity, vaultState.darkTheme) {
+        val style = if (vaultState.darkTheme) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+            else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        activity?.enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+    }
 
     LaunchedEffect(authState.isAuthenticated) {
         if (authState.isAuthenticated && !vaultState.isUnlocked && !vaultState.isUnlocking) {

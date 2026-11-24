@@ -209,7 +209,7 @@ private fun AccessProgress(stage: AuthStage) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             repeat(total) { index ->
                 Box(Modifier.weight(1f).height(4.dp).background(
-                    MaterialTheme.colorScheme.onBackground.copy(alpha = if (index < step) 1f else 0.2f), CircleShape))
+                    if (index < step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, CircleShape))
             }
         }
     }

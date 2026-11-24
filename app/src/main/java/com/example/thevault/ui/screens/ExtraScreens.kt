@@ -39,9 +39,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
-import com.example.thevault.ui.theme.VaultHeroText
-import com.example.thevault.ui.theme.VaultHeroMuted
-import com.example.thevault.ui.theme.VaultHeroAccent
 import com.example.thevault.ui.components.VaultHero
 import com.example.thevault.ui.components.VaultSection
 import com.example.thevault.ui.components.SectionHeading
@@ -68,15 +65,15 @@ fun PasswordGeneratorScreen(state: VaultUiState, viewModel: VaultViewModel) {
         item {
             VaultHero {
                 Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Text("TU NUEVA CONTRASEÑA", style = MaterialTheme.typography.labelMedium, color = VaultHeroMuted)
+                    Text("TU NUEVA CONTRASEÑA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(state.generatedPassword, style = MaterialTheme.typography.headlineSmall,
-                        fontFamily = FontFamily.Monospace, color = VaultHeroText)
+                        fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurface)
                     androidx.compose.material3.TextButton(onClick = {
                         clipboard.setText(AnnotatedString(state.generatedPassword))
                         viewModel.showMessage("Contraseña copiada")
                     }) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = null, tint = VaultHeroAccent)
-                        Text("Copiar contraseña", color = VaultHeroText, modifier = Modifier.padding(start = 12.dp))
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("Copiar contraseña", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 12.dp))
                     }
                 }
             }

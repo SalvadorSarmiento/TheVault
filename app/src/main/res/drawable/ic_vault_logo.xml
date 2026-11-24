@@ -6,10 +6,10 @@
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M50,10 C38,19 27,23 16,25 L16,47 C16,66 28,81 50,93 C72,81 84,66 84,47 L84,25 C73,23 62,19 50,10 Z"
-        android:strokeColor="#FF5B4B8A"
+        android:strokeColor="@color/vault_icon_foreground"
         android:strokeLineJoin="round"
         android:strokeWidth="5.5" />
     <path
-        android:fillColor="#FF5B4B8A"
+        android:fillColor="@color/vault_icon_foreground"
         android:pathData="M50,37 A8,8 0,1 1,49.99 37 M45.5,51 L42.5,69 L57.5,69 L54.5,51 Z" />
 </vector>

@@ -69,6 +69,9 @@ class VistasDisenoTest {
     }
 
     @Test fun presentacion() = acceso("presentacion", AuthStage.WELCOME)
+    @Test fun presentacionGrafito() = guardar("presentacion-grafito", true) {
+        LoginScreen(AuthUiState(showSplash = false, stage = AuthStage.WELCOME), {}, {}, {}, {})
+    }
     @Test fun privacidad() = acceso("privacidad", AuthStage.PRIVACY)
     @Test fun explicaRecuperacion() = acceso("explica-recuperacion", AuthStage.KEY_EXPLANATION)
     @Test fun contrasena() = acceso("contrasena", AuthStage.REGISTER_PASSWORD)
@@ -115,19 +118,43 @@ class VistasDisenoTest {
         CredentialEditorScreen(CredentialDraft(name = "Mi cuenta personal", username = "persona@ejemplo.com"), {}, {}, {})
     }
 
+    @Test fun editorGrafito() = guardar("editor-grafito", true) {
+        CredentialEditorScreen(CredentialDraft(name = "Mi cuenta personal", username = "persona@ejemplo.com"), {}, {}, {})
+    }
+
     @Test fun categorias() = guardar("categorias-cuentas", false) {
         CategoriesScreen(listOf(cuentaDeMuestra()), {})
     }
 
     @Test fun ajustes() = guardar("ajustes-cuentas", false) { SettingsScreen(false, {}, {}) }
+    @Test fun ajustesGrafito() = guardar("ajustes-grafito", true) { SettingsScreen(true, {}, {}) }
+    @Test fun categoriasGrafito() = guardar("categorias-grafito", true) {
+        CategoriesScreen(listOf(cuentaDeMuestra()), {})
+    }
 
-    @Test fun generador() {
+    @Test fun generador() = generador("generador-cuentas", false)
+    @Test fun generadorGrafito() = generador("generador-grafito", true)
+
+    private fun generador(nombre: String, oscuro: Boolean) {
         val vm = nuevoGenerador()
         try {
-            guardar("generador-cuentas", false) {
+            guardar(nombre, oscuro) {
                 PasswordGeneratorScreen(VaultUiState(generatedPassword = "Ab3!Cd4@Ef5#Gh6!Ij7@Kl8#Mn9!Op0@", generatorLength = 32), vm)
             }
         } finally { vista.runOnUiThread { vm.viewModelScope.cancel() } }
+    }
+
+    @Test fun iconoLauncher() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val icon = context.packageManager.getApplicationIcon(context.packageName)
+        assertTrue("El icono instalado debe usar el recurso adaptable actualizado", icon is android.graphics.drawable.AdaptiveIconDrawable)
+        val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        icon.setBounds(0, 0, 512, 512)
+        icon.draw(android.graphics.Canvas(bitmap))
+        val folder = File(context.getExternalFilesDir(null), "vistas-diseno")
+        check(folder.mkdirs() || folder.isDirectory)
+        File(folder, "icono-grafito.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
     }
 
     @Test fun editorPequenoConTextoGrande() {

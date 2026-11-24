@@ -1,11 +1,13 @@
 # Nuevo aspecto de TheVault
 
-- Fondos morados, botones e iconos blancos y tarjetas principales blancas con letras moradas.
+- Paleta grafito y turquesa en toda la app: fondos neutros, tarjetas diferenciadas y acciones turquesa.
+- El modo grafito es el inicial. En Ajustes puedes cambiar a una versión clara de la misma paleta.
+- Icono, logo, pantalla de inicio y barras del sistema adaptados a los nuevos colores.
 - Inicio con una bienvenida más clara.
 - Bóveda con resumen de cuentas y favoritas.
 - Tarjetas, categorías y botón para añadir cuentas más fáciles de reconocer.
 - Textos más cortos y avisos que reflejan lo que hace la app.
-- Al abrir, se mantiene el fondo morado y la bienvenida “Tus credenciales, en un solo lugar”, sin el logo sobre fondo blanco.
+- Al abrir, se mantiene el fondo grafito y la bienvenida “Tus credenciales, en un solo lugar”.
 - El primer acceso presenta la app en tres pantallas: cuentas, privacidad y recuperación.
 - El registro separa correo, contraseña, clave y confirmación, con avance visible y opción de volver.
 - Quien ya tiene cuenta entra directamente al inicio de sesión. La recuperación también tiene dos pasos.
