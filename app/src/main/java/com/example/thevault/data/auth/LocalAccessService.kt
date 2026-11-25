@@ -20,8 +20,36 @@ class LocalAccessService(
         resume(accounts.recover(email, code, password))
 
     private suspend fun resume(session: LocalSession): LocalSession {
-        try { finishImport(session.accountId); return session }
+        try { finishImport(session.accountId); finishTransferImport(session.accountId); return session }
         catch (error: Exception) { session.close(); throw error }
+    }
+
+    internal suspend fun completeTransfer(pending: PendingAccount, rows: List<CredentialEntity>): LocalSession =
+        withContext(NonCancellable) {
+            accounts.attachTransferImport(pending, rows)
+            val session = accounts.commit(pending)
+            try {
+                finishTransferImport(session.accountId)
+                session
+            } catch (error: Exception) {
+                session.close()
+                throw IllegalStateException("La cuenta quedó preparada. Inicia sesión con tu nueva contraseña para terminar de restaurarla.", error)
+            } finally { pending.close() }
+        }
+
+    private suspend fun finishTransferImport(accountId: String) = withContext(NonCancellable) {
+        val journal = accounts.pendingTransferImport(accountId) ?: return@withContext
+        database.withTransaction {
+            val dao = database.credentialDao()
+            if (!dao.hasImportReceipt(journal.id)) {
+                journal.rows.forEach { row ->
+                    check(row.ownerId == accountId && row.id == 0L)
+                    dao.insertCredential(row)
+                }
+                dao.insertImportReceipt(com.example.thevault.data.transfer.VaultImportReceipt(journal.id))
+            }
+        }
+        accounts.clearTransferImport(accountId)
     }
 
     private suspend fun finishImport(accountId: String) = withContext(NonCancellable) {

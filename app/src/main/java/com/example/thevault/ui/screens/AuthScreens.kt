@@ -88,7 +88,8 @@ fun LoginScreen(
     onStageChange: (AuthStage) -> Unit = {},
     onOldPasswordChange: (String) -> Unit = {},
     onImportChange: (Boolean) -> Unit = {},
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onReceiveTransfer: () -> Unit = {}
 ) {
     val intro = state.stage in setOf(AuthStage.WELCOME, AuthStage.PRIVACY, AuthStage.KEY_EXPLANATION)
     val canGoBack = state.stage !in setOf(AuthStage.WELCOME, AuthStage.LOGIN)
@@ -173,6 +174,10 @@ fun LoginScreen(
         }
         Spacer(Modifier.height(16.dp))
         VaultPrimaryButton(copy.action, onClick = onLogin, loading = state.isLoading)
+        if (state.stage == AuthStage.LOGIN || state.stage == AuthStage.WELCOME) {
+            TextButton(onClick = onReceiveTransfer, enabled = !state.isLoading,
+                modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Recibir por Bluetooth") }
+        }
         if (state.stage == AuthStage.LOGIN) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = { onStageChange(AuthStage.WELCOME) }, enabled = !state.isLoading) { Text("Crear cuenta") }

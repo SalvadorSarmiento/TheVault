@@ -170,7 +170,8 @@ fun CategoriesScreen(credentials: List<Credential>, onCategoryClick: (Credential
 }
 
 @Composable
-fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onLogout: () -> Unit) {
+fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onLogout: () -> Unit,
+    onTransfer: () -> Unit = {}) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = 24.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 24.dp, bottom = 32.dp),
@@ -196,6 +197,14 @@ fun SettingsScreen(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit, onL
                 trailing = { Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange) })
         }
         item { SectionHeading("Seguridad y almacenamiento") }
+        item {
+            VaultSection("Cambia de teléfono") {
+                Text("Envía una copia cifrada a otro teléfono cercano. Necesitarás ambos dispositivos y tu clave de recuperación.")
+                OutlinedButton(onClick = onTransfer, modifier = Modifier.fillMaxWidth()) {
+                    Text("Transferir por Bluetooth")
+                }
+            }
+        }
         item {
             InfoCard(
                 icon = Icons.Outlined.Lock,

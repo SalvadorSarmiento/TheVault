@@ -48,7 +48,7 @@ private val navigationItems = listOf(
 )
 
 @Composable
-fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
+fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit, onTransfer: () -> Unit = {}) {
     val state = viewModel.uiState
     val snackbarHostState = remember { SnackbarHostState() }
     val isTopLevel = state.destination in navigationItems.map { it.destination }
@@ -123,7 +123,8 @@ fun VaultAppScreen(viewModel: VaultViewModel, onLogout: () -> Unit) {
                 VaultDestination.SETTINGS -> SettingsScreen(
                     darkTheme = state.darkTheme,
                     onDarkThemeChange = viewModel::setDarkTheme,
-                    onLogout = onLogout
+                    onLogout = onLogout,
+                    onTransfer = onTransfer
                 )
                 VaultDestination.DETAIL -> CredentialDetailScreen(
                     credential = viewModel.selectedCredential,

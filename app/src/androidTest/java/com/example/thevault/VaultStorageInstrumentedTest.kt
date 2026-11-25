@@ -109,7 +109,7 @@ class VaultStorageInstrumentedTest {
 
         val database = Room.databaseBuilder(context, TheVaultDatabase::class.java, databaseName)
             .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
-            .addMigrations(TheVaultDatabase.migration3To4(context))
+            .addMigrations(TheVaultDatabase.migration3To4(context), TheVaultDatabase.MIGRATION_4_5)
             .build()
 
         val entity = database.credentialDao().getAllCredentials("demo").single()

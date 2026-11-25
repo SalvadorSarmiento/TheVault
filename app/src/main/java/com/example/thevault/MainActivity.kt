@@ -16,6 +16,9 @@ import com.example.thevault.ui.screens.SplashScreen
 import com.example.thevault.ui.screens.VaultAppScreen
 import com.example.thevault.ui.theme.TheVaultTheme
 import com.example.thevault.ui.vault.VaultViewModel
+import com.example.thevault.ui.auth.AuthStage
+import com.example.thevault.ui.transfer.BluetoothTransferViewModel
+import com.example.thevault.ui.screens.BluetoothTransferScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,7 +35,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 internal fun TheVaultApp(
     authViewModel: AuthViewModel = viewModel(),
-    vaultViewModel: VaultViewModel = viewModel()
+    vaultViewModel: VaultViewModel = viewModel(),
+    transferViewModel: BluetoothTransferViewModel = viewModel()
 ) {
     val authState = authViewModel.uiState
     val vaultState = vaultViewModel.uiState
@@ -57,6 +61,12 @@ internal fun TheVaultApp(
 
     TheVaultTheme(darkTheme = vaultState.darkTheme) {
         when {
+            transferViewModel.uiState.open -> BluetoothTransferScreen(transferViewModel) { email ->
+                if (email != null) {
+                    authViewModel.changeStage(AuthStage.LOGIN)
+                    authViewModel.onEmailChange(email)
+                }
+            }
             authState.showSplash -> SplashScreen()
             !authState.isAuthenticated -> LoginScreen(
                 state = authState,
@@ -70,11 +80,15 @@ internal fun TheVaultApp(
                 onStageChange = authViewModel::changeStage,
                 onOldPasswordChange = authViewModel::onOldPasswordChange,
                 onImportChange = authViewModel::onImportChange,
-                onBack = authViewModel::back
+                onBack = authViewModel::back,
+                onReceiveTransfer = transferViewModel::openReceiver
             )
             !vaultState.isUnlocked -> SplashScreen()
             else -> VaultAppScreen(
                 viewModel = vaultViewModel,
+                onTransfer = {
+                    authState.accountId?.let { transferViewModel.openSender(it, authState.email) }
+                },
                 onLogout = {
                     vaultViewModel.clearSession()
                     authViewModel.logout()

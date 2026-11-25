@@ -11,8 +11,8 @@ import com.example.thevault.data.model.CredentialCategory
 import com.example.thevault.data.security.CredentialCrypto
 
 @Database(
-    entities = [CredentialEntity::class],
-    version = 4,
+    entities = [CredentialEntity::class, com.example.thevault.data.transfer.VaultImportReceipt::class],
+    version = 5,
     exportSchema = false
 )
 abstract class TheVaultDatabase : RoomDatabase() {
@@ -34,12 +34,19 @@ abstract class TheVaultDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2,
                         MIGRATION_2_3,
-                        migration3To4(context.applicationContext)
+                        migration3To4(context.applicationContext),
+                        MIGRATION_4_5
                     )
                     .build()
 
                 INSTANCE = instance
                 instance
+            }
+        }
+
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS vault_import_receipts (id TEXT NOT NULL PRIMARY KEY)")
             }
         }
 

@@ -8,6 +8,11 @@ import androidx.room.Update
 
 @Dao
 interface CredentialDao {
+    @Query("SELECT EXISTS(SELECT 1 FROM vault_import_receipts WHERE id = :id)")
+    suspend fun hasImportReceipt(id: String): Boolean
+
+    @Insert
+    suspend fun insertImportReceipt(receipt: com.example.thevault.data.transfer.VaultImportReceipt)
 
     @Query("SELECT * FROM credentials WHERE ownerId = :ownerId ORDER BY id ASC")
     suspend fun getAllCredentials(ownerId: String): List<CredentialEntity>

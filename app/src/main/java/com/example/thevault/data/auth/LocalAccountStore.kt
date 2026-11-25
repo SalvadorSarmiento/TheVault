@@ -37,6 +37,13 @@ class PendingAccount internal constructor(
     override fun close() { secret.fill(0); consumed = true }
 }
 
+internal class TransferIdentity(val id: String, val email: String, val secret: ByteArray,
+    val recovery: ByteArray) : AutoCloseable {
+    override fun close() { secret.fill(0); recovery.fill(0) }
+}
+
+internal data class PendingTransferImport(val id: String, val rows: List<CredentialEntity>)
+
 /** Los archivos contienen un sobre AES-256-GCM; nunca la contraseña ni la clave en claro. */
 class LocalAccountStore(
     context: Context,
@@ -46,6 +53,49 @@ class LocalAccountStore(
     private val random = SecureRandom()
 
     @Synchronized fun hasAccounts(): Boolean = files().isNotEmpty()
+
+    @Synchronized internal fun transferIdentity(id: String, email: String, password: CharArray): TransferIdentity {
+        val record = find(normalizeEmail(email)) ?: throw IllegalArgumentException("Contraseña incorrecta.")
+        require(record.getString("id") == id) { "Vuelve a iniciar sesión." }
+        val bundle = try { unwrapPassword(record, password) }
+        catch (_: Exception) { throw IllegalArgumentException("Contraseña incorrecta.") }
+        return try { TransferIdentity(id, record.getString("email"), bundle.copyOfRange(0, 32),
+            bundle.copyOfRange(32, 64)) } finally { bundle.fill(0) }
+    }
+
+    @Synchronized internal fun prepareTransferred(id: String, email: String, secret: ByteArray,
+        recovery: ByteArray, password: CharArray): PendingAccount {
+        file(id) // Comprueba el identificador antes de usarlo como ruta.
+        val normalized = normalizeEmail(email)
+        requirePassword(password)
+        require(secret.size == 32 && recovery.size == 32)
+        require(find(normalized) == null && !file(id).exists() && !File(file(id).path + ".bak").exists()) {
+            "Esta cuenta ya está en este teléfono. No se importó otra copia."
+        }
+        val record = JSONObject().put("version", 1).put("id", id).put("email", normalized)
+        wrapPassword(record, password, secret, recovery)
+        record.put("recovery", seal(SecretKeySpec(recovery, "AES"), secret, aad(record, "recovery")))
+        return PendingAccount(id, normalized, "", record, secret.copyOf())
+    }
+
+    internal fun attachTransferImport(pending: PendingAccount, rows: List<CredentialEntity>) {
+        pending.record.put("transferImport", JSONObject().put("id", UUID.randomUUID().toString())
+            .put("rows", JSONArray().apply { rows.forEach { put(rowJson(it)) } }))
+    }
+
+    @Synchronized internal fun pendingTransferImport(id: String): PendingTransferImport? {
+        val journal = read(file(id)).optJSONObject("transferImport") ?: return null
+        val rows = journal.getJSONArray("rows")
+        return PendingTransferImport(journal.getString("id"), (0 until rows.length()).map {
+            parseRow(rows.getJSONObject(it))
+        })
+    }
+
+    @Synchronized internal fun clearTransferImport(id: String) {
+        val record = read(file(id))
+        record.remove("transferImport")
+        write(record)
+    }
 
     @Synchronized fun prepare(email: String, password: CharArray): PendingAccount {
         val normalized = normalizeEmail(email)
@@ -238,7 +288,7 @@ class LocalAccountStore(
                 "Usa una contraseña de 12 a 256 caracteres."
             }
         }
-        private fun decodeRecovery(value: String): ByteArray {
+        internal fun decodeRecovery(value: String): ByteArray {
             val normalized = value.filterNot { it.isWhitespace() || it == '-' }.uppercase(Locale.ROOT)
             require(normalized.length == 64 && normalized.all { it in "0123456789ABCDEF" }) {
                 "Escribe la clave de recuperación completa."
