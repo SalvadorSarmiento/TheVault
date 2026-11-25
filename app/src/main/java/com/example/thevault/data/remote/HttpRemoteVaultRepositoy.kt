@@ -25,7 +25,8 @@ class RemoteApiException(
 class HttpRemoteVaultRepository(
     baseUrl: String,
     private val tokenProvider: ApiTokenProvider,
-    private val crypto: CredentialCipher
+    private val crypto: CredentialCipher,
+    private val creationKey: (Long) -> String
 ) : RemoteVaultRepository {
 
     private val baseUrl = baseUrl.trimEnd('/').also { value ->
@@ -43,7 +44,7 @@ class HttpRemoteVaultRepository(
             path = "/api/v1/credentials"
         )
 
-        val items = JSONObject(response).getJSONArray("items")
+        val items = JSONObject(response.body).getJSONArray("items")
 
         val decoded = withContext(Dispatchers.Default) {
             buildList {
@@ -77,11 +78,18 @@ class HttpRemoteVaultRepository(
         val remoteId = credential.remoteId
 
         val response = if (remoteId.isNullOrBlank()) {
-            request(
+            val key = withContext(Dispatchers.IO) { creationKey(credential.id) }
+            val created = request(
                 method = "POST",
                 path = "/api/v1/credentials",
-                body = body
+                body = body,
+                idempotencyKey = key
             )
+            if (created.replayed) {
+                // El usuario pudo editar la copia local mientras esperaba conexión.
+                val id = JSONObject(created.body).getString("id")
+                request("PUT", "/api/v1/credentials/${Uri.encode(id)}", body)
+            } else created
         } else {
             request(
                 method = "PUT",
@@ -91,7 +99,7 @@ class HttpRemoteVaultRepository(
         }
 
         return withContext(Dispatchers.Default) {
-            JSONObject(response)
+            JSONObject(response.body)
                 .toCredential()
                 .first
                 .copy(id = credential.id)
@@ -112,8 +120,9 @@ class HttpRemoteVaultRepository(
     private suspend fun request(
         method: String,
         path: String,
-        body: JSONObject? = null
-    ): String {
+        body: JSONObject? = null,
+        idempotencyKey: String? = null
+    ): ApiResponse {
         val token = tokenProvider.idToken()
 
         return withContext(Dispatchers.IO) {
@@ -125,6 +134,9 @@ class HttpRemoteVaultRepository(
                 connection.instanceFollowRedirects = false
                 connection.connectTimeout = 15_000
                 connection.readTimeout = 15_000
+                if (idempotencyKey != null) {
+                    connection.setRequestProperty("Idempotency-Key", idempotencyKey)
+                }
                 connection.setRequestProperty(
                     "Authorization",
                     "Bearer $token"
@@ -168,12 +180,14 @@ class HttpRemoteVaultRepository(
                     )
                 }
 
-                responseBody
+                ApiResponse(responseBody, connection.getHeaderField("Idempotency-Replayed") == "true")
             } finally {
                 connection.disconnect()
             }
         }
     }
+
+    private data class ApiResponse(val body: String, val replayed: Boolean)
 
     private fun InputStream.readBoundedUtf8(): String {
         val buffer = ByteArray(8192)

@@ -11,6 +11,7 @@ import com.example.thevault.data.auth.FirebaseIdTokenProvider
 import com.example.thevault.data.model.Credential
 import com.example.thevault.data.model.CredentialCategory
 import com.example.thevault.data.remote.HttpRemoteVaultRepository
+import com.example.thevault.data.remote.CredentialCreationKeys
 import com.example.thevault.data.remote.RemoteVaultRepository
 import com.example.thevault.data.repository.RoomVaultRepository
 import com.example.thevault.data.repository.VaultRepository
@@ -69,7 +70,8 @@ class VaultViewModel @JvmOverloads constructor(
         HttpRemoteVaultRepository(
             baseUrl = BuildConfig.API_BASE_URL,
             tokenProvider = FirebaseIdTokenProvider(),
-            crypto = cipher
+            crypto = cipher,
+            creationKey = CredentialCreationKeys(application.noBackupFilesDir)::forCredential
         )
     }
 ) : AndroidViewModel(application) {
@@ -328,6 +330,13 @@ class VaultViewModel @JvmOverloads constructor(
         val httpRepository = remoteRepository ?: return
         uiState = uiState.copy(isSyncing = true)
         runCatching {
+            // Resolver primero las creaciones pendientes evita importar otra copia tras perder una respuesta.
+            localRepository.getCredentials().filter { it.remoteId.isNullOrBlank() }.forEach { pending ->
+                val synchronized = httpRepository.saveCredential(pending)
+                if (version != sessionVersion) return
+                check(!synchronized.remoteId.isNullOrBlank()) { "La API no devolvió el identificador de la cuenta" }
+                localRepository.saveCredential(synchronized.copy(id = pending.id))
+            }
             val remoteCredentials = httpRepository.getCredentials()
             if (version != sessionVersion) return
             val localCredentials = localRepository.getCredentials()
@@ -338,12 +347,6 @@ class VaultViewModel @JvmOverloads constructor(
                 check(!remote.remoteId.isNullOrBlank()) { "La API no devolvió el identificador de la cuenta" }
                 val local = byRemoteId[remote.remoteId]
                 byRemoteId[remote.remoteId] = localRepository.saveCredential(remote.copy(id = local?.id ?: 0L))
-            }
-
-            localRepository.getCredentials().filter { it.remoteId.isNullOrBlank() }.forEach { pending ->
-                val synchronized = httpRepository.saveCredential(pending)
-                check(!synchronized.remoteId.isNullOrBlank()) { "La API no devolvió el identificador de la cuenta" }
-                localRepository.saveCredential(synchronized.copy(id = pending.id))
             }
 
             if (version == sessionVersion) {

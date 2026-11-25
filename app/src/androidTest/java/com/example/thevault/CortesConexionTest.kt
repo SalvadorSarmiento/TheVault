@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.thevault.data.auth.ApiTokenProvider
 import com.example.thevault.data.TheVaultDatabase
 import com.example.thevault.data.remote.HttpRemoteVaultRepository
+import com.example.thevault.data.remote.CredentialCreationKeys
 import com.example.thevault.data.repository.VaultRepository
 import com.example.thevault.data.repository.RoomVaultRepository
 import com.example.thevault.ui.vault.VaultViewModel
@@ -66,6 +67,15 @@ class CortesConexionTest {
 
     @Test
     fun perderLaRespuestaDespuesDeCrearNoDebeDuplicarAlReconectar() = runBlocking<Unit> {
+        perderRespuesta(editar = false)
+    }
+
+    @Test
+    fun editarTrasPerderLaRespuestaConservaLosCambiosSinDuplicar() = runBlocking<Unit> {
+        perderRespuesta(editar = true)
+    }
+
+    private suspend fun perderRespuesta(editar: Boolean) {
         val prueba = Prueba()
         try {
             prueba.abrir()
@@ -76,16 +86,37 @@ class CortesConexionTest {
             control("/desconectar")
             esperar { !prueba.vm.uiState.isSaving }
             assertEquals(null, prueba.local.getCredentials().single().remoteId)
+            val localId = prueba.local.getCredentials().single().id
+            if (editar) {
+                principal {
+                    prueba.vm.openCredential(localId)
+                    prueba.vm.startEdit()
+                    prueba.vm.updateDraft { it.copy(name = "Cuenta corregida") }
+                    prueba.vm.saveDraft()
+                }
+                esperar { !prueba.vm.uiState.isSaving }
+            }
             control("/conectar")
             prueba.reabrir()
             val servidor = control("/estado").getInt("cuentas")
             val telefono = prueba.local.getCredentials().size
             assertEquals("Tras perder la respuesta: servidor=$servidor, teléfono=$telefono", 1, servidor)
             assertEquals(1, telefono)
+            assertEquals(localId, prueba.local.getCredentials().single().id)
+            if (editar) {
+                assertEquals("Cuenta corregida", prueba.local.getCredentials().single().name)
+                prueba.reabrir()
+                assertEquals("Cuenta corregida", prueba.local.getCredentials().single().name)
+                assertEquals(1, control("/estado").getInt("cuentas"))
+            }
         } finally { prueba.cerrar() }
     }
 
     private class Prueba {
+        private val keyDirectory = java.io.File(
+            ApplicationProvider.getApplicationContext<Application>().cacheDir,
+            "claves-cortes-${java.util.UUID.randomUUID()}"
+        ).apply { mkdirs() }
         private val database = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext<Application>(), TheVaultDatabase::class.java
         ).build()
@@ -104,7 +135,8 @@ class CortesConexionTest {
                     { cipher -> HttpRemoteVaultRepository(
                         "http://localhost:18082",
                         object : ApiTokenProvider { override suspend fun idToken() = "dev:prueba-cortes" },
-                        cipher
+                        cipher,
+                        CredentialCreationKeys(keyDirectory)::forCredential
                     ) }
                 )
             }
@@ -132,7 +164,7 @@ class CortesConexionTest {
 
         fun cerrar() {
             principal { vm.clearSession(); vm.viewModelScope.cancel() }
-            try { control("/desconectar") } finally { database.close() }
+            try { control("/desconectar") } finally { database.close(); keyDirectory.deleteRecursively() }
         }
     }
 

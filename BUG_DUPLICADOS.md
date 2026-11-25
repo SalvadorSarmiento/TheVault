@@ -7,20 +7,16 @@ Se reprodujo con respuestas lentas: un solo toque generaba dos creaciones.
 Ahora las operaciones esperan su turno y Guardar se bloquea mientras termina.
 La edición conserva el identificador de la cuenta ya guardada.
 
-Antes, las tres pruebas del fallo generaban dos registros. Con la corrección
-mantienen uno. Pasaron 10 pruebas de la app y 6 de la API en local.
+Para cubrir la pérdida de respuesta, la app conserva un identificador por
+creación y lo envía como `Idempotency-Key`. La API reconoce el reintento y devuelve
+la misma cuenta. Si hubo una edición pendiente, se actualiza ese registro.
+Al reconectar, se resuelven los guardados pendientes antes de descargar la lista.
 
-Rama de prueba: `prueba/credenciales-duplicadas`. La API se comprobó en local;
-no se cambió su código ni se borraron las copias existentes.
+Requiere también la API de `dayanaArmasB/API_TheVault`, rama
+`prueba/evitar-duplicados`. Los clientes antiguos sin esta cabecera todavía pueden
+generar copias al reintentar. No se borran duplicados existentes.
 
-Pruebas adicionales con cortes reales de conexión, la API local y Room temporal:
-
-- API desconectada al guardar: conserva una sola cuenta al reconectar.
-- Corte antes de que la API guarde: conserva una sola cuenta al reconectar.
-- Corte después de guardar, antes de responder: todavía duplica; quedan dos
-  cuentas en el servidor y dos en el teléfono.
-
-Este último fallo sigue pendiente. La API debe reconocer el reintento como la
-misma creación. La primera corrección no cubre ese caso.
+La app sigue usando acceso local; esta corrección no activa la sincronización.
+Las pruebas con API usan cuentas ficticias y una base temporal.
 
 Para repetirlo, consulta [las pruebas de conexión](PRUEBAS_CORTES.md).

@@ -78,6 +78,7 @@ class Puente(socketserver.StreamRequestHandler):
                 cabecera = (
                     f"HTTP/1.1 {respuesta.status} {respuesta.reason}\r\n"
                     "Content-Type: application/json\r\n"
+                    f"Idempotency-Replayed: {respuesta.getheader('Idempotency-Replayed', 'false')}\r\n"
                     f"Content-Length: {len(contenido)}\r\nConnection: close\r\n\r\n"
                 )
                 self.wfile.write(cabecera.encode("iso-8859-1") + contenido)

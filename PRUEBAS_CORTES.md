@@ -1,7 +1,9 @@
 # Pruebas de conexión en local
 
 Usan la API del repositorio y una base temporal, con cuentas inventadas.
-La tercera prueba falla actualmente porque reproduce el duplicado pendiente.
+Cubren guardar sin conexión, cortar antes de guardar, perder la respuesta tras
+guardar y editar antes de reconectar. Cada caso debe terminar con una sola cuenta.
+Usa también la rama `prueba/evitar-duplicados` del repositorio de la API.
 No se ejecutan por defecto: hay que activar `api_cortes=true`.
 
 Abre el emulador. En una terminal, sustituye las rutas e inicia la API de prueba:

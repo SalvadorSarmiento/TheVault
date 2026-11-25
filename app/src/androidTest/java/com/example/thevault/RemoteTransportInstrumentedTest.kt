@@ -84,7 +84,8 @@ class RemoteTransportInstrumentedTest {
             val repository = HttpRemoteVaultRepository(
                 "http://localhost:${server.localPort}",
                 object : ApiTokenProvider { override suspend fun idToken() = "test-token" },
-                unusedCipher
+                unusedCipher,
+                { id -> "prueba:$id" }
             )
             block(server, repository)
         }
